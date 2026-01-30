@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
 
-export default function QuoteRequestPage() {
+function QuoteRequestForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -210,5 +210,22 @@ export default function QuoteRequestPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function QuoteRequestPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    }>
+      <QuoteRequestForm />
+    </Suspense>
   );
 }
