@@ -34,6 +34,9 @@ import {
 import type { Project } from '@/types/projects';
 import type { ServiceTemplate } from '@/types/services';
 
+// Force dynamic rendering for this page
+export const dynamic = 'force-dynamic';
+
 export default function ProjectsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
