@@ -44,7 +44,7 @@ export default function ProjectCreatedEmail({
 
           <Section style={projectBox}>
             <Heading style={projectTitle}>{projectName}</Heading>
-            <Text style={projectDescription}>{projectDescription}</Text>
+            <Text style={projectDescriptionStyle}>{projectDescription}</Text>
             {assignee && (
               <Text style={assigneeText}>
                 <strong>Assigned to:</strong> {assignee}
@@ -113,7 +113,7 @@ const projectTitle = {
   margin: '0 0 12px',
 };
 
-const projectDescription = {
+const projectDescriptionStyle = {
   color: '#404040',
   fontSize: '16px',
   lineHeight: '24px',
