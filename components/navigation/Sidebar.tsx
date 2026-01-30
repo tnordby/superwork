@@ -28,6 +28,7 @@ import {
   Grid3x3,
   FolderKanban,
   Shield,
+  Zap,
 } from 'lucide-react';
 
 interface NavItem {
@@ -217,6 +218,11 @@ export function Sidebar() {
       label: 'Assets',
       href: '/assets',
       icon: Folder,
+    },
+    {
+      label: 'Integrations',
+      href: '/integrations',
+      icon: Zap,
     },
   ];
 
