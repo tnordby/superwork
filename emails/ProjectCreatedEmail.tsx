@@ -26,6 +26,7 @@ export default function ProjectCreatedEmail({
   assignee,
   projectLink,
 }: ProjectCreatedEmailProps) {
+  // Email template for project creation notifications
   return (
     <Html>
       <Head />
