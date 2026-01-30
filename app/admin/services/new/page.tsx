@@ -54,7 +54,7 @@ export default function NewServicePage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-4xl">
       <div className="mb-6">
         <Link
           href="/admin/services"
@@ -64,7 +64,7 @@ export default function NewServicePage() {
         </Link>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-white rounded-lg border border-gray-200 p-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
           Create New Service Template
         </h2>
