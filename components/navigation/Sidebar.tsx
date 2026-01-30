@@ -134,7 +134,91 @@ export function Sidebar() {
   const router = useRouter();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Projects', 'Account']));
   const { isCollapsed, setIsCollapsed } = useSidebar();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+
+  // Check if user is admin
+  const isAdmin = user?.user_metadata?.role === 'admin';
+
+  // Build navigation items dynamically based on user role
+  const dynamicNavigationItems: (NavItem | ExpandableNavItem)[] = [
+    {
+      label: 'Home',
+      href: '/',
+      icon: Home,
+    },
+    ...(isAdmin ? [{
+      label: 'Admin',
+      href: '/admin',
+      icon: Shield,
+    }] : []),
+    {
+      label: 'Projects',
+      icon: Briefcase,
+      subItems: [
+        {
+          label: 'All services',
+          href: '/projects?tab=browse',
+          icon: Grid3x3,
+        },
+        {
+          label: 'My projects',
+          href: '/projects/active',
+          icon: FolderKanban,
+        },
+      ],
+    },
+    {
+      label: 'Inbox',
+      href: '/inbox',
+      icon: Inbox,
+    },
+    {
+      label: 'Account',
+      icon: Wallet,
+      subItems: [
+        {
+          label: 'Balance',
+          href: '/account/balance',
+          icon: CreditCard,
+        },
+        {
+          label: 'Usage',
+          href: '/account/usage',
+          icon: BarChart3,
+        },
+        {
+          label: 'Plan',
+          href: '/account/plan',
+          icon: Layers,
+        },
+        {
+          label: 'Invoices',
+          href: '/account/invoices',
+          icon: FileText,
+        },
+        {
+          label: 'Members',
+          href: '/account/members',
+          icon: Users,
+        },
+        {
+          label: 'Teams',
+          href: '/account/teams',
+          icon: FolderTree,
+        },
+        {
+          label: 'Settings',
+          href: '/account/settings',
+          icon: Settings,
+        },
+      ],
+    },
+    {
+      label: 'Assets',
+      href: '/assets',
+      icon: Folder,
+    },
+  ];
 
   const toggleSection = (label: string) => {
     setExpandedSections((prev) => {
@@ -206,7 +290,7 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="space-y-1">
-            {navigationItems.map((item) => {
+            {dynamicNavigationItems.map((item) => {
               if (isExpandableNavItem(item)) {
                 const isExpanded = expandedSections.has(item.label);
                 const Icon = item.icon;
