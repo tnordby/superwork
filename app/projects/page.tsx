@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -34,10 +34,7 @@ import {
 import type { Project } from '@/types/projects';
 import type { ServiceTemplate } from '@/types/services';
 
-// Force dynamic rendering for this page
-export const dynamic = 'force-dynamic';
-
-export default function ProjectsPage() {
+function ProjectsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const tabParam = searchParams.get('tab');
@@ -594,5 +591,20 @@ export default function ProjectsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ProjectsPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+        </div>
+      </div>
+    }>
+      <ProjectsPageContent />
+    </Suspense>
   );
 }
