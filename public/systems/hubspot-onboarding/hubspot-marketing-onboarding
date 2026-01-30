@@ -1,0 +1,329 @@
+## PRD — Predefined Service: HubSpot Marketing Hub Onboarding (Full, Updated)
+
+**Priority:** 🔴 High  
+**Service type:** Predefined consulting service  
+**Applies to:** Superwork customer portal  
+**Depends on:** Projects, SOPs, Tasks, Milestones, Permissions, Progress Tracking
+
+---
+
+## 1. Purpose
+
+Define a **single, standardized predefined service** called:
+
+> **HubSpot Marketing Hub Onboarding**
+
+This service is intentionally scoped to **Marketing Hub only**.  
+Other hubs (Sales, Service, Content, Data, Commerce) are separate services with their own PRDs.
+
+This service:
+- Has a fixed, standardized project description
+- Uses one internal SOP (provider/admin only)
+- Generates a customer-visible task list and milestones
+- Tracks progress purely based on completed tasks
+- Allows providers/admins to add custom tasks when required
+
+---
+
+## 2. Service Template (Supabase Seed)
+
+### 2.1 Service Template Record
+
+**service_templates**
+
+- `name`: `HubSpot Marketing Hub Onboarding`
+
+- `customer_description` (standardized, visible to all):
+
+> This project covers the setup and configuration of **HubSpot Marketing Hub** to establish a solid marketing foundation.  
+>  
+> We will configure core marketing infrastructure including data privacy and consent settings, domains and redirects, forms and calls-to-action, email templates and subscription preferences, landing page templates, marketing workflows, automation, and reporting.  
+>  
+> All work is delivered using a standardized implementation process. You can follow progress in real time through tasks and milestones in this portal.  
+>  
+> Progress is tracked automatically based on completed tasks, and you’ll be notified as the project moves through each phase.
+
+---
+
+## 3. Project Phases (Status)
+
+All projects created from this service use the following phases:
+
+- Planning  
+- In Progress  
+- Review  
+- Approval  
+- Blocked  
+- Completed  
+
+### Rules
+- Only **providers and admins** can change phases
+- Phase changes are logged (who, when, from → to)
+- Customers can view, but never modify, project phases
+
+---
+
+## 4. Progress Calculation
+
+Project progress is calculated automatically:
+
+progress_percentage = completed_tasks / total_tasks * 100
+
+
+### Rules
+- All default tasks count
+- All custom tasks count
+- Customers see:
+  - A progress bar
+  - Percentage only
+- Providers/admins see full task-level detail
+
+---
+
+## 5. Visibility & Permissions
+
+| Element              | Customer | Provider | Admin |
+|----------------------|----------|----------|-------|
+| Project description  | ✅       | ✅       | ✅    |
+| Tasks                | ✅       | ✅       | ✅    |
+| Complete tasks       | ❌       | ✅       | ✅    |
+| SOP                  | ❌       | ✅       | ✅    |
+| Change project phase | ❌       | ✅       | ✅    |
+
+---
+
+## 6. Milestones (Customer-visible)
+
+The following milestones are created automatically for every project:
+
+1. **Foundation & Access**
+2. **Marketing Hub Setup**
+3. **Handoff & Validation**
+
+Milestones are used for clarity and grouping only.  
+They do **not** affect progress math directly.
+
+---
+
+## 7. Internal SOP (Provider/Admin Only)
+
+### SOP — HubSpot Marketing Hub: Setup & Configuration
+
+**Knowledgeable worker:** Thorstein Nordby  
+**System type:** Marketing / HubSpot  
+**System interval:** Triggered (new HubSpot portal, rebuild, or major marketing change)
+
+This SOP defines **how** Marketing Hub onboarding is executed internally.  
+It is **never visible to customers**.
+
+---
+
+### SOP Sections (Internal, Full)
+
+#### 1. File Manager Setup
+- Navigate to Marketing → Files
+- Create folder structure:
+  - `brand`
+    - `logo`
+    - `svg`
+    - `png`
+    - `jpg`
+    - `fonts`
+    - `favicon`
+  - `campaigns`
+  - `video`
+  - `images`
+  - `scripts`
+- Upload all brand assets to correct folders
+
+---
+
+#### 2. Data Privacy & Consent
+- Navigate to Privacy / Consent settings
+- Configure consent banner:
+  - Design and placement
+  - Cookie and data usage text
+  - Cookie preference options
+  - Geo-based display rules (if required)
+- Integrate tracking scripts correctly
+- Ensure accessibility compliance
+- Include link to Privacy Policy
+- Test on desktop and mobile
+- Publish to live site
+
+---
+
+#### 3. Email Subscription Types
+- Navigate to Marketing → Email → Subscription Types
+- Create required subscription types
+- Add name and description
+- Configure data privacy messaging (if enabled)
+- Select communication method
+- Reorder subscription types logically
+- Add translations for international contacts if needed
+
+---
+
+#### 4. Domains & Subdomains
+- Navigate to Website → Domains & URLs
+- Connect required domains and subdomains
+- Configure:
+  - Primary vs secondary domains
+  - Redirect rules
+  - SSL provisioning
+- Validate DNS records with IT or provider
+- Confirm domain health
+
+---
+
+#### 5. Forms
+- Create:
+  - Newsletter signup form
+  - Contact form
+  - Request demo / talk to sales form
+- Configure:
+  - Required fields
+  - GDPR options
+  - Notifications
+  - Redirects / thank-you messages
+- Test submissions end-to-end
+
+---
+
+#### 6. Calls-to-Action (CTAs)
+- Create core CTAs (button/image)
+- Configure destination links
+- Set display rules
+- Preview and publish
+- Monitor basic analytics
+
+---
+
+#### 7. Email Marketing Templates
+- Create base email template
+- Configure branding, fonts, and layout
+- Enable tracking
+- Test on desktop and mobile
+
+---
+
+#### 8. Landing Page Templates
+- Select appropriate template type (starter/theme/custom)
+- Configure:
+  - SEO defaults
+  - Language
+  - Featured images
+- Publish and validate rendering
+- Test responsiveness
+
+---
+
+#### 9. Design Manager & Fonts
+- Upload custom font files to Files
+- Add `@font-face` rules in Design Manager stylesheet
+- Apply fonts via CSS
+- Validate usage across templates
+
+---
+
+#### 10. Advertising Channels
+- Connect ad accounts (Google, LinkedIn, Meta if applicable)
+- Authorize access
+- Configure attribution and tracking
+- Validate sync
+
+---
+
+#### 11. Social Media Accounts
+- Connect social channels
+- Configure posting permissions
+- Validate analytics connection
+
+---
+
+#### 12. Marketing Workflows
+- Create workflow folder structure:
+  - Data governance
+  - Deal automation
+  - Marketing
+  - Operations
+  - Archive
+- Implement governance and lifecycle workflows
+- Test enrollments and actions
+
+---
+
+#### 13. Reporting & Dashboards
+- Create marketing dashboards
+- Configure core KPIs
+- Validate filters and date ranges
+- Share dashboards with stakeholders
+
+---
+
+## 8. Customer-Visible Tasks (Generated Automatically)
+
+### Milestone: Foundation & Access
+
+1. Confirm marketing goals and primary conversion paths  
+2. Confirm HubSpot access and user permissions  
+3. Confirm DNS / IT contact for domain setup  
+4. Confirm brand assets are available  
+
+---
+
+### Milestone: Marketing Hub Setup
+
+5. File manager structure created  
+6. Brand assets uploaded  
+7. Privacy & consent banner configured  
+8. Email subscription types created  
+9. Domains and redirects connected  
+10. Core website forms created  
+11. Thank-you pages or confirmation messages configured  
+12. CTAs created and published  
+13. Email templates created and tested  
+14. Landing page templates configured  
+15. Custom fonts added via Design Manager  
+16. Advertising channels connected  
+17. Social media accounts connected  
+18. Marketing workflows implemented  
+19. Marketing dashboards created  
+
+---
+
+### Milestone: Handoff & Validation
+
+20. Internal QA completed  
+21. Customer walkthrough prepared  
+22. Documentation and summary shared  
+23. Customer approval confirmed  
+
+---
+
+## 9. Custom Tasks
+
+- Providers and admins can add custom tasks
+- Custom tasks:
+  - Are visible to customers
+  - Count toward progress
+  - Must belong to an existing milestone
+- Customers cannot add, edit, or complete tasks
+
+---
+
+## 10. Completion Rules
+
+- Project can move to **Completed** when:
+  - All tasks are completed, or
+  - Admin overrides completion with a logged reason (optional)
+
+---
+
+## 11. Acceptance Criteria
+
+- The service description is consistent across all customers
+- Tasks accurately reflect real delivery work
+- SOP guides providers without leaking internal detail
+- Progress updates automatically and transparently
+- The service is reusable, scalable, and productized

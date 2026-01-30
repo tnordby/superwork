@@ -1,0 +1,174 @@
+## PRD — Project Management & Delivery Execution (with Kanban View)
+
+**Priority:** 🔴 High  
+**Depends on:** Authentication, Organizations, Users, Email Notifications  
+**Status:** Core customer & provider feature
+
+This PRD defines how **projects are created, executed, tracked, and visualized** inside the Superwork portal.  
+It extends the project management system with a **Kanban-style project view** that gives customers transparency and providers execution control.
+
+---
+
+## 1. Purpose & Scope
+
+**Purpose**  
+Give customers a structured, transparent way to request and follow work — and give providers a standardized, operational way to deliver consulting projects using SOP-driven execution.
+
+The project system must:
+- Standardize delivery through SOPs and tasks
+- Make progress visible without exposing internal complexity
+- Allow providers to actively manage delivery stages
+- Prevent customers from accidentally disrupting execution
+
+---
+
+## 2. Core Concepts
+
+### 2.1 Project
+
+A **Project** represents a discrete consulting engagement (e.g. “HubSpot CRM Setup”, “ABM Campaign Setup”).
+
+Projects:
+- Belong to a customer organization
+- Are based on predefined templates or a custom brief
+- Have an associated SOP (internal)
+- Surface progress and stage visually to customers
+
+---
+
+### 2.2 Project Template (Predefined Project)
+
+Reusable project definitions created by Superwork.
+
+Includes:
+- Name
+- Customer-facing description
+- Linked SOP
+- Default task list
+- Eligible plans (optional)
+
+---
+
+### 2.3 SOP (Standard Operating Procedure)
+
+Defines *how* the project is delivered internally.
+
+- Visible to providers and admins only
+- Used to generate tasks
+- Enforces consistency across consultants
+
+---
+
+## 3. Customer Experience
+
+### 3.1 Project Creation
+
+Customers can start projects in **two ways**:
+
+#### Option A — Predefined Project
+1. Customer selects from a curated list
+2. Adds optional context
+3. Project is created in `planned` stage
+
+#### Option B — Custom Project Brief
+1. Customer writes a custom brief
+2. Project is created without SOP
+3. Provider assigns SOP later
+
+---
+
+### 3.2 Customer Project View
+
+When clicking into a project, the customer sees:
+
+- Project title and description
+- Current project stage (Kanban)
+- **Read-only Kanban board**
+- Progress bar (percentage)
+- Provider updates
+- Delivered assets
+
+Customers **cannot**:
+- Move project stages
+- Modify tasks
+- See SOPs or internal notes
+
+---
+
+## 4. Provider Experience
+
+### 4.1 Provider Project View
+
+Providers see:
+- Same Kanban board as customer
+- Full task checklist
+- SOP details
+- Internal notes
+- Ability to move project between stages
+
+---
+
+## 5. Kanban View (Per Project)
+
+Each project has a **dedicated Kanban board** representing the *delivery lifecycle*, not individual tasks.
+
+### 5.1 Kanban Columns (Default)
+
+The Kanban board consists of fixed columns:
+
+1. **Planned**
+2. **In Progress**
+3. **Blocked**
+4. **Review**
+5. **Completed**
+
+These stages are standardized across all projects.
+
+---
+
+### 5.2 Kanban Card
+
+Each project has **one card** that moves across the board.
+
+The card displays:
+- Project name
+- Assigned provider(s)
+- Progress percentage
+- Last updated timestamp
+
+---
+
+### 5.3 Permissions
+
+- **Providers**
+  - Can move the project card between stages
+  - Can mark stages as blocked or ready for review
+- **Customers**
+  - Can view the Kanban board
+  - Cannot move cards or change stages
+- **Admins**
+  - Full control
+
+All stage changes are logged.
+
+---
+
+## 6. Task Checklist & Progress Calculation
+
+### 6.1 Task Checklist (Internal)
+
+Tasks are generated from the SOP.
+
+Each task includes:
+- Title
+- Description
+- Status
+- Optional evidence
+- Internal notes
+
+---
+
+### 6.2 Progress Bar Logic
+
+Project progress is calculated automatically:
+

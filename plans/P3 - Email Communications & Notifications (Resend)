@@ -1,0 +1,251 @@
+    ## PRD — Email Communications & Notifications (Resend)
+
+**Priority:** 🔴 High  
+**Status:** Foundational (required for authentication, onboarding, and client communication)
+
+This PRD defines how the Superwork portal sends **transactional and notification emails** using **Resend**, covering login flows, invitations, and ongoing client notifications.
+
+---
+
+## 1. Purpose & Scope
+
+**Purpose**  
+Provide reliable, branded, and secure email communication between Superwork and its users.
+
+Email is required for:
+- Authentication (login, password reset)
+- Inviting users to organizations
+- Notifying customers about project activity
+- Communicating billing and account updates
+
+This PRD covers **transactional and system emails only**.
+
+---
+
+## 2. Email Provider
+
+- **Provider:** Resend
+- **Email type:** Transactional (no marketing in v1)
+- **Delivery requirement:** High reliability and fast delivery
+- **Branding:** Superwork branded sender
+
+---
+
+## 3. Sender Identity & Domains
+
+### Sender Configuration
+- **From name:** Superwork
+- **From email:** `no-reply@superwork.com` (or verified subdomain)
+- **Reply-to:** not required in v1 (future: support@)
+
+### Domain Setup
+- Domain verified in Resend
+- SPF, DKIM, and DMARC configured
+- No shared sender domains
+
+**Acceptance criteria**
+- Emails land in inbox, not spam
+- Domain reputation is protected
+
+---
+
+## 4. Email Types (v1)
+
+### 4.1 Authentication Emails
+
+#### Login / Magic Link (if enabled)
+- Trigger: user requests login
+- Content:
+  - Secure login link
+  - Expiration notice
+  - Device/IP hint (optional)
+- CTA: “Log in to Superwork”
+
+#### Password Reset
+- Trigger: user requests password reset
+- Content:
+  - Reset link
+  - Expiration notice
+  - Security disclaimer
+
+---
+
+### 4.2 Invitation Emails
+
+#### Organization Invite (Customer → Colleague)
+- Trigger: customer admin invites user
+- Content:
+  - Inviter name
+  - Organization name
+  - Invite acceptance link
+- CTA: “Join [Company] on Superwork”
+
+#### Provider Invite (Admin → Consultant)
+- Trigger: admin invites provider
+- Content:
+  - Role explanation
+  - Invite link
+- CTA: “Accept invite”
+
+---
+
+### 4.3 Account & Subscription Notifications
+
+#### Welcome Email
+- Trigger: new organization created (self-service or admin-created)
+- Content:
+  - Brief explanation of Superwork
+  - Link to portal
+  - Next steps
+
+#### Plan Change
+- Trigger: subscription plan updated
+- Content:
+  - Old plan → new plan
+  - Effective date
+
+---
+
+### 4.4 Project & Delivery Notifications
+
+#### Project Created
+- Trigger: new project added
+- Recipients:
+  - Customer org members
+  - Assigned providers
+- Content:
+  - Project name
+  - Link to project
+
+#### Project Status Update
+- Trigger: status changes
+- Content:
+  - Old status → new status
+  - Short message from provider (optional)
+
+---
+
+### 4.5 Asset & Message Notifications
+
+#### New Deliverable Uploaded
+- Trigger: asset marked as final
+- Content:
+  - Project name
+  - Download link
+
+#### New Message / Feedback
+- Trigger: new comment added
+- Content:
+  - Author name
+  - Project context
+  - Link to thread
+
+---
+
+### 4.6 Billing Notifications
+
+#### Invoice Issued
+- Trigger: new invoice available
+- Content:
+  - Invoice number
+  - Amount
+  - Due date
+  - Link to invoice
+
+---
+
+## 5. Notification Rules
+
+### General Rules
+- Emails are **opt-outable** per notification category (v2)
+- No email spam or activity floods
+- Group similar events when possible
+
+### v1 Defaults
+- All transactional emails enabled
+- No granular notification settings yet
+
+---
+
+## 6. Email Template Requirements
+
+### Design
+- Clean, minimal, text-first layout
+- Superwork branding
+- Works in dark and light email clients
+- Accessible (contrast, readable fonts)
+
+### Content Rules
+- Clear subject lines
+- One primary CTA per email
+- Plain language
+- No marketing language
+
+---
+
+## 7. Technical Integration
+
+### Backend Requirements
+- All emails triggered server-side
+- Resend API used via secure environment keys
+- Idempotency to prevent duplicate sends
+- Logging of email events (sent, failed)
+
+### Data Requirements
+Each email must include:
+- Recipient user ID
+- Related entity ID (org, project, invoice)
+- Timestamp
+
+---
+
+## 8. Email Logging & Observability
+
+### Required
+- Log all sent emails
+- Track failures
+- Ability to replay failed sends (admin-only)
+
+### Non-Goals (v1)
+- Open tracking
+- Click tracking
+- Marketing analytics
+
+---
+
+## 9. Security & Compliance
+
+- Tokens in links must:
+  - Be single-use
+  - Expire
+- No sensitive data in email body
+- GDPR-compliant handling of personal data
+
+---
+
+## 10. Explicit Non-Goals
+
+- Marketing emails
+- Newsletters
+- Drip campaigns
+- In-app notifications (separate PRD)
+
+---
+
+## 11. Key Acceptance Criteria
+
+- Users receive login and invite emails reliably
+- Emails are branded and professional
+- No duplicate or spammy notifications
+- All critical portal actions have email coverage
+- Failed emails are visible to admins
+
+---
+
+## 12. Definition of Done
+
+When this PRD is complete:
+- Authentication and onboarding emails work end-to-end
+- Customers and providers stay informed without logging in
+- The portal feels trustworthy and production-ready
+- Email is no longer a blocker for core flows
