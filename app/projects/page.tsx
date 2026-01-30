@@ -594,6 +594,9 @@ function ProjectsPageContent() {
   );
 }
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export default function ProjectsPage() {
   return (
     <Suspense fallback={
