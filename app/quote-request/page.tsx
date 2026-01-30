@@ -86,20 +86,6 @@ function QuoteRequestForm() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Service */}
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-6">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="font-medium text-gray-700">Category:</span>
-                <p className="text-gray-900 mt-1">{formData.category}</p>
-              </div>
-              <div>
-                <span className="font-medium text-gray-700">Service:</span>
-                <p className="text-gray-900 mt-1">{formData.service_type}</p>
-              </div>
-            </div>
-          </div>
-
           {/* Project Title */}
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-gray-900 mb-2">
@@ -165,7 +151,7 @@ function QuoteRequestForm() {
           <div className="flex items-center justify-end gap-4 pt-6 border-t border-gray-200">
             <Link
               href="/projects?tab=browse"
-              className="rounded-lg px-6 py-3 text-sm font-medium text-gray-700 hover:text-gray-900"
+              className="rounded-lg border border-gray-900 px-6 py-3 text-sm font-medium text-gray-700 hover:text-gray-900"
             >
               Cancel
             </Link>

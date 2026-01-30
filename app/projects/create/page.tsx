@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import MarketingHubForm from './MarketingHubForm';
+import DynamicIntakeForm from './DynamicIntakeForm';
 
 interface ServiceTemplate {
   id: string;
@@ -51,6 +52,8 @@ function CreateProjectForm() {
   const [error, setError] = useState('');
   const [serviceTemplate, setServiceTemplate] = useState<ServiceTemplate | null>(null);
   const [templateLoading, setTemplateLoading] = useState(false);
+  const [intakeResponses, setIntakeResponses] = useState<Record<string, any> | null>(null);
+  const [hasIntakeForm, setHasIntakeForm] = useState(false);
 
   // Fetch service template if templateId is provided
   useEffect(() => {
@@ -71,6 +74,27 @@ function CreateProjectForm() {
               category: data.template.category,
               service_type: data.template.name,
             }));
+
+            // Check if this service has an intake form
+            console.log('About to fetch intake form for template:', templateId);
+            fetch(`/api/services/${templateId}/intake-form`)
+              .then(res => {
+                console.log('Intake form response status:', res.status);
+                return res.json();
+              })
+              .then(intakeData => {
+                console.log('Intake form data received:', intakeData);
+                if (intakeData.fields && intakeData.fields.length > 0) {
+                  console.log('✅ Setting hasIntakeForm to true, fields:', intakeData.fields.length);
+                  setHasIntakeForm(true);
+                } else {
+                  console.log('❌ No intake form fields found');
+                }
+              })
+              .catch(err => {
+                console.error('❌ Error checking intake form:', err);
+                console.error('Error details:', err.message);
+              });
           } else {
             console.error('No template in response:', data);
           }
@@ -93,6 +117,63 @@ function CreateProjectForm() {
       setFormData(prev => ({ ...prev, category, service_type: service || '' }));
     }
   }, [searchParams]);
+
+  const handleIntakeFormSubmit = async (responses: Record<string, any>) => {
+    setIntakeResponses(responses);
+    setLoading(true);
+    setError('');
+
+    try {
+      const templateId = searchParams.get('templateId');
+
+      const payload: any = {
+        name: serviceTemplate?.name || formData.name || 'Untitled Project',
+        description: formData.description,
+        category: serviceTemplate?.category || formData.category,
+        service_type: serviceTemplate?.name || formData.service_type,
+      };
+
+      // If we have a template, include the template ID
+      if (templateId) {
+        payload.service_template_id = templateId;
+      }
+
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create project');
+      }
+
+      // Save intake form responses
+      if (responses && templateId) {
+        try {
+          await fetch(`/api/projects/${data.project.id}/intake-response`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              serviceTemplateId: templateId,
+              responses: responses,
+            }),
+          });
+        } catch (err) {
+          console.error('Error saving intake responses:', err);
+          // Don't block project creation if intake save fails
+        }
+      }
+
+      // Redirect to the new project
+      router.push(`/projects/${data.project.id}`);
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,6 +205,23 @@ function CreateProjectForm() {
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create project');
+      }
+
+      // Save intake form responses if we have them
+      if (intakeResponses && templateId) {
+        try {
+          await fetch(`/api/projects/${data.project.id}/intake-response`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              serviceTemplateId: templateId,
+              responses: intakeResponses,
+            }),
+          });
+        } catch (err) {
+          console.error('Error saving intake responses:', err);
+          // Don't block project creation if intake save fails
+        }
       }
 
       // Redirect to the new project
@@ -352,10 +450,26 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
         )}
 
         {(() => {
-          console.log('Rendering form. serviceTemplate:', serviceTemplate);
-          console.log('serviceTemplate name:', serviceTemplate?.name);
+          console.log('🔍 Rendering form. serviceTemplate:', serviceTemplate);
+          console.log('🔍 serviceTemplate name:', serviceTemplate?.name);
+          console.log('🔍 Has intake form:', hasIntakeForm);
+
           const isMarketingHub = serviceTemplate?.name === 'HubSpot Marketing Hub Onboarding';
-          console.log('Is Marketing Hub:', isMarketingHub);
+          console.log('🔍 Is Marketing Hub:', isMarketingHub);
+
+          // Use dynamic intake form if available (and not Marketing Hub which has custom form)
+          if (hasIntakeForm && !isMarketingHub && serviceTemplate) {
+            console.log('✅ Rendering DynamicIntakeForm');
+            return (
+              <DynamicIntakeForm
+                serviceTemplateId={serviceTemplate.id}
+                onSubmit={handleIntakeFormSubmit}
+                loading={loading}
+              />
+            );
+          }
+
+          console.log('⚠️ Rendering fallback form:', isMarketingHub ? 'Marketing Hub' : 'Generic');
           return isMarketingHub ? renderMarketingHubForm() : renderGenericForm();
         })()}
       </div>

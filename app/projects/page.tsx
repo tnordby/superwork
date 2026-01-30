@@ -30,6 +30,7 @@ import {
   AlertCircle,
   Pause,
   Eye,
+  FileText,
 } from 'lucide-react';
 import type { Project } from '@/types/projects';
 import type { ServiceTemplate } from '@/types/services';
@@ -314,18 +315,9 @@ function ProjectsPageContent() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">Projects</h1>
-          <p className="text-gray-600">Manage your projects and browse available services</p>
-        </div>
-        <Link
-          href="/projects/create"
-          className="flex items-center gap-2 rounded-xl bg-[#bfe937] px-6 py-3 text-sm font-medium text-gray-900 transition-opacity hover:opacity-90"
-        >
-          <Plus className="h-4 w-4" />
-          New Project
-        </Link>
+      <div className="mb-8">
+        <h1 className="text-3xl font-semibold text-gray-900 mb-2">Projects</h1>
+        <p className="text-gray-600">Manage your projects and browse available services</p>
       </div>
 
       {/* Tabs */}
@@ -369,15 +361,24 @@ function ProjectsPageContent() {
                 <Rocket className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No projects yet</h3>
                 <p className="text-sm text-gray-600 mb-6">
-                  Get started by creating your first project
+                  Get started by browsing our services or submitting a custom brief
                 </p>
-                <Link
-                  href="/projects/create"
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#bfe937] px-6 py-3 text-sm font-medium text-gray-900 transition-opacity hover:opacity-90"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create Project
-                </Link>
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => setActiveTab('browse')}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#bfe937] px-6 py-3 text-sm font-medium text-gray-900 transition-opacity hover:opacity-90"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                    Browse services
+                  </button>
+                  <Link
+                    href="/quote-request"
+                    className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Submit custom brief
+                  </Link>
+                </div>
               </div>
             </div>
           ) : (

@@ -1,0 +1,222 @@
+# Service Template: HubSpot Sales Onboarding
+
+> **Template Version:** 1.0  
+> **Created:** 2026-01-30  
+> **Category:** HubSpot Services
+
+---
+
+## 📋 Service Overview
+
+### Service Name
+HubSpot Sales Onboarding
+
+### Customer Description
+We onboard your sales team to HubSpot the right way. This service configures pipelines, properties, lifecycle logic, automation, reporting, and the Sales Workspace so reps know what to do every day—and leadership can trust the numbers.
+
+### Estimated Hours
+60
+
+### Is Active
+- [x] Yes (visible to customers)
+- [ ] No (hidden from customers)
+
+---
+
+## 🎯 Standard Operating Procedures (SOPs)
+
+> **Note:** SOPs are INTERNAL ONLY and never visible to customers.
+
+---
+
+### SOP 1: Account, Users & CRM Foundations
+
+**Order Index:** 0  
+**Description:** Establishes users, permissions, and a clean CRM data model that sales can trust.
+
+#### Tasks
+
+1. **User & Team Setup**
+   - Description: Create users, assign permissions, and structure teams by role, region, and segment.
+   - Estimated Hours: 5
+   - Is Required: Yes
+
+2. **Email & Calendar Connections**
+   - Description: Connect inboxes and calendars, enable logging and tracking, and verify meeting sync.
+   - Estimated Hours: 3
+   - Is Required: Yes
+
+3. **Deal Property Model**
+   - Description: Define and standardize required deal properties (ICP fit, buyer role, source, close reasons).
+   - Estimated Hours: 6
+   - Is Required: Yes
+
+4. **Stage-Based Data Enforcement**
+   - Description: Enforce required properties per deal stage to prevent unqualified pipeline movement.
+   - Estimated Hours: 4
+   - Is Required: Yes
+
+---
+
+### SOP 2: Sales Process & Execution Setup
+
+**Order Index:** 1  
+**Description:** Configures pipelines, lifecycle logic, tasks, and Sales Workspace for daily execution.
+
+#### Tasks
+
+1. **Sales Pipeline Configuration**
+   - Description: Build deal stages aligned to the real sales process with probabilities and guardrails.
+   - Estimated Hours: 5
+   - Is Required: Yes
+
+2. **Lifecycle Stage & Lead Status Definition**
+   - Description: Align lifecycle stages and lead status usage rules with the sales team.
+   - Estimated Hours: 3
+   - Is Required: Yes
+
+3. **Sales Workspace Configuration**
+   - Description: Configure Sales Workspace views, filters, and task queues for reps.
+   - Estimated Hours: 4
+   - Is Required: Yes
+
+4. **Task Defaults & Execution Rules**
+   - Description: Define task naming conventions, due dates, and queues.
+   - Estimated Hours: 2
+   - Is Required: Yes
+
+---
+
+### SOP 3: Automation, Sequences & Reporting
+
+**Order Index:** 2  
+**Description:** Automates handoffs, follow-ups, and reporting so the system runs without manual policing.
+
+#### Tasks
+
+1. **Email Templates & Sequences**
+   - Description: Create core email templates and sequences for outbound, inbound, and re-engagement.
+   - Estimated Hours: 6
+   - Is Required: Yes
+
+2. **Sales Automation (Workflows)**
+   - Description: Build workflows for lifecycle updates, deal stage automation, owner assignment, and tasks.
+   - Estimated Hours: 8
+   - Is Required: Yes
+
+3. **Sales Dashboards & Reporting**
+   - Description: Build core dashboards for pipeline, forecast, win/loss, and rep activity.
+   - Estimated Hours: 8
+   - Is Required: Yes
+
+---
+
+## 📝 Intake Form Configuration
+
+> **Purpose:** Collect enough context to onboard Sales Hub correctly without rework.
+
+### Form Fields
+
+#### 1. Sales Hub Tier
+- **Field Type:** select
+- **Label:** Which Sales Hub tier are you on?
+- **Required:** Yes
+- **Options:**
+  - Sales Hub Professional
+  - Sales Hub Enterprise
+
+#### 2. Number of Sales Reps
+- **Field Type:** number
+- **Label:** How many sales users will actively use HubSpot?
+- **Placeholder:** e.g. 5
+- **Required:** Yes
+
+#### 3. Sales Roles
+- **Field Type:** multiselect
+- **Label:** Which sales roles do you have?
+- **Required:** Yes
+- **Options:**
+  - SDR
+  - Account Executive
+  - Account Manager
+  - Sales Manager
+  - Founder / CEO
+
+#### 4. Sales Motion
+- **Field Type:** multiselect
+- **Label:** Which sales motions do you run?
+- **Required:** Yes
+- **Options:**
+  - Outbound
+  - Inbound
+  - Account-based
+  - Partner-led
+
+#### 5. Current CRM State
+- **Field Type:** select
+- **Label:** What best describes your current HubSpot setup?
+- **Required:** Yes
+- **Options:**
+  - Brand new portal
+  - Existing portal needing cleanup
+  - Major sales process change
+
+#### 6. Defined Sales Process
+- **Field Type:** radio
+- **Label:** Do you already have a documented sales process?
+- **Required:** Yes
+- **Options:**
+  - Yes
+  - No
+  - Partially
+
+#### 7. Reporting Requirements
+- **Field Type:** textarea
+- **Label:** What sales metrics do leadership care about most?
+- **Placeholder:** Pipeline, forecast accuracy, win rate, activity per rep, etc.
+- **Required:** No
+
+#### 8. Tool Integrations
+- **Field Type:** multiselect
+- **Label:** Which tools should HubSpot integrate with?
+- **Required:** No
+- **Options:**
+  - Gmail
+  - Outlook
+  - Slack
+  - Aircall
+  - Younium
+  - Other
+
+### Conditional Logic
+
+**Rule 1:**
+- If `Defined Sales Process` equals `No`
+- Then show: `Reporting Requirements`
+
+---
+
+## 🎨 Presentation
+
+### Icon Selection
+**Suggested Icon:** Workflow
+
+### Color Gradient
+**Gradient Class:** from-blue-400 to-indigo-600
+
+---
+
+## 📊 Success Metrics
+
+### Deliverables
+- [x] Fully onboarded HubSpot Sales Hub
+- [x] Sales Workspace ready for daily use
+- [x] Automated lifecycle & deal logic
+- [x] Sales dashboards for leadership
+
+### Success Criteria
+1. Reps consistently use tasks, sequences, and pipelines
+2. Deals cannot progress without qualification data
+3. Leadership trusts pipeline and forecast numbers
+
+---

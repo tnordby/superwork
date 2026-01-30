@@ -212,17 +212,17 @@ export function Sidebar() {
           href: '/account/settings',
           icon: Settings,
         },
+        {
+          label: 'Integrations',
+          href: '/integrations',
+          icon: Zap,
+        },
       ],
     },
     {
       label: 'Assets',
       href: '/assets',
       icon: Folder,
-    },
-    {
-      label: 'Integrations',
-      href: '/integrations',
-      icon: Zap,
     },
   ];
 
