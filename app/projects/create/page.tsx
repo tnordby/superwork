@@ -118,6 +118,36 @@ function CreateProjectForm() {
     }
   }, [searchParams]);
 
+  // Format dynamic intake form responses into markdown description
+  const formatIntakeResponses = async (responses: Record<string, any>, templateId: string) => {
+    // Fetch the intake form fields to get labels
+    const intakeFormRes = await fetch(`/api/services/${templateId}/intake-form`);
+    const intakeFormData = await intakeFormRes.json();
+
+    const standardDescription = serviceTemplate?.customer_description || '';
+
+    let intakeFormMarkdown = '\n\n# Intake Form\n\n';
+
+    if (intakeFormData.fields) {
+      intakeFormData.fields.forEach((field: any) => {
+        const value = responses[field.field_name];
+        if (value !== undefined && value !== null && value !== '') {
+          intakeFormMarkdown += `## ${field.label}\n`;
+
+          // Format based on field type
+          if (Array.isArray(value)) {
+            // Multiselect, checkbox
+            intakeFormMarkdown += value.map(v => `- ${v}`).join('\n') + '\n\n';
+          } else {
+            intakeFormMarkdown += `${value}\n\n`;
+          }
+        }
+      });
+    }
+
+    return standardDescription + intakeFormMarkdown;
+  };
+
   const handleIntakeFormSubmit = async (responses: Record<string, any>) => {
     setIntakeResponses(responses);
     setLoading(true);
@@ -126,9 +156,15 @@ function CreateProjectForm() {
     try {
       const templateId = searchParams.get('templateId');
 
+      // Format intake responses into description
+      let description = formData.description;
+      if (templateId && responses) {
+        description = await formatIntakeResponses(responses, templateId);
+      }
+
       const payload: any = {
         name: serviceTemplate?.name || formData.name || 'Untitled Project',
-        description: formData.description,
+        description: description,
         category: serviceTemplate?.category || formData.category,
         service_type: serviceTemplate?.name || formData.service_type,
       };

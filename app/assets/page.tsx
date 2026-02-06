@@ -1,130 +1,249 @@
 'use client';
 
-import { useState } from 'react';
-import { Upload, FileText, Image as ImageIcon, File, Download, Trash2, Search } from 'lucide-react';
-
-interface Asset {
-  id: number;
-  name: string;
-  type: 'logo' | 'pdf' | 'image' | 'other';
-  size: string;
-  uploadedDate: string;
-  url?: string;
-}
+import { useState, useEffect, useCallback } from 'react';
+import { Upload, FileText, Image as ImageIcon, File, Download, Trash2, Search, FolderOpen, Share2, Loader2 } from 'lucide-react';
+import { Asset, Workspace, formatFileSize, FILE_TYPE_ICONS } from '@/types/assets';
+import AssetShareModal from '@/components/AssetShareModal';
 
 export default function AssetsPage() {
-  const [assets, setAssets] = useState<Asset[]>([
-    {
-      id: 1,
-      name: 'Brand Logo.svg',
-      type: 'logo',
-      size: '45 KB',
-      uploadedDate: '2026-01-20',
-    },
-    {
-      id: 2,
-      name: 'Marketing Presentation.pdf',
-      type: 'pdf',
-      size: '2.3 MB',
-      uploadedDate: '2026-01-18',
-    },
-    {
-      id: 3,
-      name: 'Hero Image.jpg',
-      type: 'image',
-      size: '1.8 MB',
-      uploadedDate: '2026-01-15',
-    },
-  ]);
-
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  const [isUploading, setIsUploading] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files) return;
+  // Load workspaces and assets on mount
+  useEffect(() => {
+    loadWorkspaces();
+    loadAssets();
+  }, [selectedWorkspace]);
 
-    const newAssets: Asset[] = Array.from(files).map((file, index) => ({
-      id: assets.length + index + 1,
-      name: file.name,
-      type: getFileType(file.name),
-      size: formatFileSize(file.size),
-      uploadedDate: new Date().toISOString().split('T')[0],
-    }));
-
-    setAssets([...assets, ...newAssets]);
-  };
-
-  const getFileType = (filename: string): Asset['type'] => {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    if (['svg', 'png', 'jpg', 'jpeg'].includes(ext || '')) {
-      if (filename.toLowerCase().includes('logo')) return 'logo';
-      return 'image';
+  const loadWorkspaces = async () => {
+    try {
+      const response = await fetch('/api/workspaces');
+      if (response.ok) {
+        const data = await response.json();
+        setWorkspaces(data.workspaces || []);
+      }
+    } catch (error) {
+      console.error('Failed to load workspaces:', error);
     }
-    if (ext === 'pdf') return 'pdf';
-    return 'other';
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  const loadAssets = async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedWorkspace) {
+        params.append('workspace_id', selectedWorkspace);
+      }
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
+
+      const response = await fetch(`/api/assets?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAssets(data.assets || []);
+      } else {
+        console.error('Failed to load assets');
+      }
+    } catch (error) {
+      console.error('Failed to load assets:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const getFileIcon = (type: Asset['type']) => {
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery !== undefined) {
+        loadAssets();
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileKey = `${file.name}-${Date.now()}`;
+
+      try {
+        setUploadProgress((prev) => ({ ...prev, [fileKey]: 0 }));
+
+        const formData = new FormData();
+        formData.append('file', file);
+        if (selectedWorkspace) {
+          formData.append('workspace_id', selectedWorkspace);
+        }
+        formData.append('visibility', 'workspace');
+
+        const response = await fetch('/api/assets/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (response.ok) {
+          setUploadProgress((prev) => ({ ...prev, [fileKey]: 100 }));
+          await loadAssets();
+        } else {
+          const error = await response.json();
+          alert(`Failed to upload ${file.name}: ${error.error}`);
+        }
+      } catch (error) {
+        console.error('Upload error:', error);
+        alert(`Failed to upload ${file.name}`);
+      } finally {
+        setTimeout(() => {
+          setUploadProgress((prev) => {
+            const newProgress = { ...prev };
+            delete newProgress[fileKey];
+            return newProgress;
+          });
+        }, 1000);
+      }
+    }
+
+    setIsUploading(false);
+    event.target.value = '';
+  };
+
+  const getFileIcon = (type: Asset['file_type']) => {
     switch (type) {
       case 'logo':
       case 'image':
         return <ImageIcon className="h-5 w-5" />;
       case 'pdf':
         return <FileText className="h-5 w-5" />;
+      case 'font':
+        return <File className="h-5 w-5" />;
       default:
         return <File className="h-5 w-5" />;
     }
   };
 
-  const getFileColor = (type: Asset['type']) => {
+  const getFileColor = (type: Asset['file_type']) => {
     switch (type) {
       case 'logo':
       case 'image':
         return 'bg-blue-100 text-blue-600';
       case 'pdf':
         return 'bg-red-100 text-red-600';
+      case 'font':
+        return 'bg-purple-100 text-purple-600';
       default:
         return 'bg-gray-100 text-gray-600';
     }
   };
 
-  const filteredAssets = assets.filter((asset) =>
-    asset.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleDownload = async (assetId: string, fileName: string) => {
+    try {
+      const response = await fetch(`/api/assets/${assetId}/download`);
+      if (response.ok) {
+        const data = await response.json();
+        window.open(data.download_url, '_blank');
+      } else {
+        alert('Failed to download asset');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download asset');
+    }
+  };
 
-  const handleDelete = (id: number) => {
-    setAssets(assets.filter((asset) => asset.id !== id));
+  const handleDelete = async (assetId: string, assetName: string) => {
+    if (!confirm(`Are you sure you want to delete "${assetName}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/assets/${assetId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        await loadAssets();
+      } else {
+        const error = await response.json();
+        alert(`Failed to delete: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Failed to delete asset');
+    }
+  };
+
+  const handleShare = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setShareModalOpen(true);
   };
 
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">Assets</h1>
-        <p className="text-gray-600">Central location for delivered work and shared materials</p>
+        <h1 className="text-3xl font-semibold text-gray-900 mb-2">Shared Asset Library</h1>
+        <p className="text-gray-600">Central location for brand assets, documents, and shared materials</p>
       </div>
+
+      {/* Workspace Selector */}
+      {workspaces.length > 0 && (
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Workspace
+          </label>
+          <select
+            value={selectedWorkspace || ''}
+            onChange={(e) => setSelectedWorkspace(e.target.value || null)}
+            className="w-full md:w-64 rounded-xl border border-gray-200 bg-white py-2 px-4 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+          >
+            <option value="">All Workspaces</option>
+            {workspaces.map((workspace) => (
+              <option key={workspace.id} value={workspace.id}>
+                {workspace.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Upload Area */}
       <div className="mb-8">
         <label
           htmlFor="file-upload"
-          className="group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 p-12 transition-all hover:border-gray-400 hover:bg-gray-100"
+          className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 p-12 transition-all ${
+            isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-400 hover:bg-gray-100'
+          }`}
         >
           <div className="flex flex-col items-center text-center">
             <div className="mb-4 rounded-full bg-[#bfe937] p-4 transition-transform group-hover:scale-110">
-              <Upload className="h-8 w-8 text-gray-900" />
+              {isUploading ? (
+                <Loader2 className="h-8 w-8 text-gray-900 animate-spin" />
+              ) : (
+                <Upload className="h-8 w-8 text-gray-900" />
+              )}
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">Upload Assets</h3>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">
+              {isUploading ? 'Uploading...' : 'Upload Assets'}
+            </h3>
             <p className="mb-1 text-sm text-gray-600">
               Click to browse or drag and drop your files
             </p>
             <p className="text-xs text-gray-500">
-              Supports: Images (PNG, JPG, SVG), PDFs, and other documents
+              Supports: Images (PNG, JPG, SVG, WebP), PDFs, Fonts (TTF, OTF, WOFF)
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Max file size: 50MB
             </p>
           </div>
           <input
@@ -132,10 +251,31 @@ export default function AssetsPage() {
             type="file"
             className="hidden"
             multiple
-            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+            accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp,application/pdf,.ttf,.otf,.woff,.woff2"
             onChange={handleFileUpload}
+            disabled={isUploading}
           />
         </label>
+
+        {/* Upload Progress */}
+        {Object.keys(uploadProgress).length > 0 && (
+          <div className="mt-4 space-y-2">
+            {Object.entries(uploadProgress).map(([key, progress]) => (
+              <div key={key} className="bg-white rounded-lg p-3 border border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-700">{key.split('-')[0]}</span>
+                  <span className="text-sm text-gray-500">{progress}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-[#bfe937] h-2 rounded-full transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -156,13 +296,17 @@ export default function AssetsPage() {
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">
-            Your Assets ({filteredAssets.length})
+            Your Assets ({assets.length})
           </h2>
         </div>
 
-        {filteredAssets.length > 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          </div>
+        ) : assets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredAssets.map((asset) => (
+            {assets.map((asset) => (
               <div
                 key={asset.id}
                 className="group rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-gray-300 hover:shadow-lg"
@@ -170,28 +314,46 @@ export default function AssetsPage() {
                 {/* File Icon */}
                 <div
                   className={`mb-4 flex h-16 w-16 items-center justify-center rounded-xl ${getFileColor(
-                    asset.type
+                    asset.file_type
                   )}`}
                 >
-                  {getFileIcon(asset.type)}
+                  {getFileIcon(asset.file_type)}
                 </div>
 
                 {/* File Info */}
                 <h3 className="mb-1 truncate text-base font-semibold text-gray-900" title={asset.name}>
                   {asset.name}
                 </h3>
-                <p className="mb-4 text-sm text-gray-600">
-                  {asset.size} • {new Date(asset.uploadedDate).toLocaleDateString()}
+                <p className="mb-2 text-sm text-gray-600">
+                  {formatFileSize(asset.file_size)} • {new Date(asset.created_at).toLocaleDateString()}
                 </p>
+                {asset.uploaded_by && (
+                  <p className="mb-3 text-xs text-gray-500">
+                    Uploaded by {asset.uploaded_by}
+                  </p>
+                )}
+                {asset.category && (
+                  <span className="inline-block mb-3 text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                    {asset.category}
+                  </span>
+                )}
 
                 {/* Actions */}
-                <div className="flex gap-2">
-                  <button className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200">
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => handleDownload(asset.id, asset.name)}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
+                  >
                     <Download className="h-4 w-4" />
-                    Download
                   </button>
                   <button
-                    onClick={() => handleDelete(asset.id)}
+                    onClick={() => handleShare(asset)}
+                    className="flex items-center justify-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(asset.id, asset.name)}
                     className="flex items-center justify-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -202,6 +364,7 @@ export default function AssetsPage() {
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-12 text-center">
+            <FolderOpen className="h-16 w-16 mx-auto mb-4 text-gray-400" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No assets found</h3>
             <p className="text-gray-600">
               {searchQuery ? 'Try a different search term' : 'Upload your first asset to get started'}
@@ -209,6 +372,18 @@ export default function AssetsPage() {
           </div>
         )}
       </div>
+
+      {/* Share Modal */}
+      {selectedAsset && (
+        <AssetShareModal
+          asset={selectedAsset}
+          isOpen={shareModalOpen}
+          onClose={() => {
+            setShareModalOpen(false);
+            setSelectedAsset(null);
+          }}
+        />
+      )}
     </div>
   );
 }
