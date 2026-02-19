@@ -1,0 +1,326 @@
+
+
+## 1. Problem Statement
+
+Superwork currently has no in-platform mechanism for clients to pay for their subscription. Billing is managed manually (invoices, bank transfers, or external payment links), which creates:
+
+- Delayed or missed payments
+- Manual overhead for the Superwork team to track and reconcile payments
+- No self-serve way for clients to manage, upgrade, or cancel their subscription
+- Inconsistent billing cycles across clients
+- Lack of automated dunning and payment failure handling
+
+This prevents Superwork from scaling its client base efficiently and introduces revenue risk.
+
+---
+
+## 2. Goal
+
+Integrate **Stripe** into the Superwork Client Portal to enable:
+
+- Clients to subscribe to a Superwork plan on a recurring basis
+- Support for **monthly, quarterly, bi-annual, and annual** billing cycles
+- Secure card storage via Stripe's hosted UI components
+- Automated invoicing, renewal, and payment failure handling
+- A self-serve billing management experience within the client portal
+
+---
+
+## 3. Non-Goals
+
+This feature will **not**:
+
+- Support cryptocurrencies, ACH, or SEPA (for now — future consideration)
+- Manage consultant payouts or internal compensation
+- Replace Stripe's hosted invoicing for compliance purposes
+- Handle VAT/tax logic beyond what Stripe Tax provides out of the box (future phase)
+
+---
+
+## 4. User Roles
+
+### Client User
+- View available subscription plans and billing intervals
+- Enter and save a payment method (card)
+- Subscribe to a plan
+- View current plan, next billing date, and invoice history
+- Update or remove their payment method
+- Cancel or downgrade their subscription
+
+### Admin (Internal — Superwork Team)
+- View subscription status for all clients
+- Manually apply discounts or coupons via Stripe Dashboard
+- Override or cancel subscriptions
+- Access Stripe Dashboard for full billing visibility
+
+---
+
+## 5. User Stories
+
+### Client
+- As a client, I want to subscribe to Superwork using my credit card so I can get access immediately without waiting for an invoice.
+- As a client, I want to choose a billing interval (monthly, quarterly, bi-annual, or annual) so I can pick what fits my budget.
+- As a client, I want my card to be charged automatically on renewal so I don't have to do anything each cycle.
+- As a client, I want to view my invoices and payment history inside the portal.
+- As a client, I want to update my card details if my card expires or changes.
+- As a client, I want to cancel my subscription from within the portal without needing to contact support.
+
+### Admin
+- As an admin, I want to see which clients have active, past-due, or cancelled subscriptions so I can manage relationships proactively.
+- As an admin, I want Stripe to handle retry logic so I'm not manually chasing failed payments.
+
+---
+
+## 6. Functional Requirements
+
+### 6.1 Subscription Plans
+
+Each plan maps to a **Stripe Product** with a set of **Stripe Prices** — one per billing interval.
+
+**Billing Intervals Supported:**
+
+| Interval | Stripe Equivalent |
+|---|---|
+| Monthly | `interval: month`, `interval_count: 1` |
+| Quarterly | `interval: month`, `interval_count: 3` |
+| Bi-Annual | `interval: month`, `interval_count: 6` |
+| Annual | `interval: year`, `interval_count: 1` |
+
+Plan pricing and interval options will be configured in the Stripe Dashboard and fetched via the Stripe API at runtime. Discounts for longer commitments (e.g. 10% off annual) are applied via Stripe Coupons or by setting the price directly.
+
+---
+
+### 6.2 Checkout & Card Collection
+
+- Use **Stripe Checkout** (hosted) or **Stripe Elements** (embedded) — recommended to start with Stripe Checkout for speed and PCI compliance.
+- On plan selection, the client is directed to Stripe Checkout with the correct `price_id`.
+- Upon successful payment, Stripe redirects the client back to a `/billing/success` route in the portal.
+- On cancellation or failure, redirect to `/billing/cancel`.
+
+**Stripe Checkout Session Parameters:**
+
+```
+mode: subscription
+payment_method_types: [card]
+line_items: [{ price: <price_id>, quantity: 1 }]
+customer_email: <client_email>
+client_reference_id: <superwork_client_id>
+success_url: https://app.superwork.com/billing/success?session_id={CHECKOUT_SESSION_ID}
+cancel_url: https://app.superwork.com/billing/cancel
+```
+
+---
+
+### 6.3 Customer & Subscription Management
+
+- On first successful checkout, create or associate a **Stripe Customer** with the Superwork client record.
+- Store `stripe_customer_id` and `stripe_subscription_id` on the client's record in the Superwork database (Supabase).
+- The client's active subscription status is the source of truth for access control.
+
+**Client Billing Portal:**
+
+Use **Stripe Customer Portal** (hosted) to allow clients to:
+- Update their card
+- View invoices
+- Cancel their subscription
+- Switch billing intervals (if enabled)
+
+Access is granted by generating a `BillingPortal.Session` server-side and redirecting the client.
+
+---
+
+### 6.4 Webhooks
+
+Stripe webhooks must be consumed to keep Superwork's database in sync with Stripe's subscription state. All webhook events must be verified using the Stripe webhook signature.
+
+**Required Webhook Events:**
+
+| Event | Action |
+|---|---|
+| `checkout.session.completed` | Activate client subscription, store `stripe_customer_id` and `stripe_subscription_id` |
+| `invoice.paid` | Mark subscription as active, record payment in invoice history |
+| `invoice.payment_failed` | Mark subscription as `past_due`, trigger email notification to client |
+| `customer.subscription.updated` | Sync plan/interval changes |
+| `customer.subscription.deleted` | Mark client subscription as cancelled, revoke access |
+| `payment_method.attached` | Confirm card on file updated |
+
+Webhook handler lives at: `POST /api/stripe/webhook`
+
+---
+
+### 6.5 Access Control
+
+Subscription status gates access to the Superwork portal:
+
+| Status | Access |
+|---|---|
+| `active` | Full access |
+| `trialing` | Full access (if trial is enabled) |
+| `past_due` | Limited access + banner prompting payment update |
+| `canceled` | No access; redirect to resubscribe page |
+| `incomplete` | Pending payment; show checkout flow |
+
+Subscription status is checked on each authenticated session via a middleware layer that reads `stripe_subscription_status` from the Superwork database (kept up to date via webhooks).
+
+---
+
+### 6.6 Billing UI (Client Portal)
+
+**Plan Selection Page (`/billing/plans`)**
+
+- Display available plans and all billing interval options
+- Show pricing per interval, with annual/bi-annual savings highlighted
+- CTA: "Subscribe" → initiates Stripe Checkout
+
+**Billing Dashboard (`/billing`)**
+
+- Current plan name and billing interval
+- Next billing date and amount
+- Subscription status badge (Active / Past Due / Cancelled)
+- Button: "Manage Billing" → opens Stripe Customer Portal
+- Invoice history table: date, amount, status, PDF download link
+
+**Post-Checkout Pages**
+
+- `/billing/success` — confirmation message, transition to active state
+- `/billing/cancel` — return to plan selection with soft prompt
+
+---
+
+## 7. Data Model
+
+New fields added to the `clients` table in Supabase:
+
+| Column | Type | Description |
+|---|---|---|
+| `stripe_customer_id` | `text` | Stripe Customer ID (`cus_xxx`) |
+| `stripe_subscription_id` | `text` | Active Stripe Subscription ID (`sub_xxx`) |
+| `stripe_subscription_status` | `text` | Mirrors Stripe status: `active`, `past_due`, `canceled`, etc. |
+| `stripe_price_id` | `text` | Currently active Stripe Price ID |
+| `subscription_interval` | `text` | `monthly`, `quarterly`, `biannual`, `annual` |
+| `current_period_end` | `timestamptz` | End of current billing period |
+
+---
+
+## 8. Technical Architecture
+
+```
+Client Browser
+     │
+     ▼
+Superwork Frontend (Next.js / React)
+     │  Plan selection, billing dashboard, portal redirect
+     │
+     ▼
+Superwork API (server-side)
+     │  Creates Checkout Sessions, Customer Portal Sessions
+     │  Validates webhook signatures
+     │
+     ▼
+Stripe API
+     │  Subscription lifecycle, card storage, invoicing
+     │
+     └──► Webhook ──► POST /api/stripe/webhook ──► Supabase DB
+```
+
+**Environment Variables Required:**
+
+```
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_CUSTOMER_PORTAL_URL=https://billing.stripe.com/...
+```
+
+---
+
+## 9. Security & Compliance
+
+- Card data is **never** stored in Superwork's database — all card handling is done by Stripe (PCI DSS compliant).
+- Stripe Checkout and Elements are served from Stripe's domain and comply with PCI SAQ A.
+- All server-side Stripe calls use the secret key; publishable key is exposed to the client only.
+- Webhook payloads are verified using `stripe.webhooks.constructEvent()` before any action is taken.
+- HTTPS required for all billing-related endpoints.
+
+---
+
+## 10. Error Handling
+
+| Scenario | Handling |
+|---|---|
+| Card declined at checkout | Stripe Checkout handles natively with retry |
+| Payment fails on renewal | `invoice.payment_failed` webhook → `past_due` status → email to client |
+| Stripe API unreachable | Surface error to client, log server-side, do not block access immediately |
+| Duplicate webhook delivery | Use idempotency: check if event already processed before acting |
+| Client attempts access while `canceled` | Redirect to `/billing/plans` with resubscribe prompt |
+
+---
+
+## 11. Email Notifications
+
+Stripe's built-in email notifications will be enabled for:
+
+- Successful payment receipts
+- Upcoming renewal reminders (3 days before)
+- Failed payment notifications
+
+Superwork may supplement with custom transactional emails (e.g. via Resend or Postmark) for:
+
+- Welcome/onboarding after first successful payment
+- Subscription cancelled confirmation
+- Plan upgrade/downgrade confirmation
+
+---
+
+## 12. Analytics & Reporting (Internal)
+
+Tracked via Stripe Dashboard and optionally synced to internal analytics:
+
+- MRR / ARR by plan
+- Churn rate (cancellations per period)
+- Failed payment rate
+- Breakdown by billing interval (monthly vs. annual)
+- Average revenue per client
+
+---
+
+## 13. Phased Rollout
+
+### Phase 1 — Core Billing (MVP)
+- Stripe Checkout integration for new client subscriptions
+- Monthly and annual intervals only
+- Webhook handling for core events
+- Billing dashboard with Stripe Customer Portal
+- Access gating based on subscription status
+
+### Phase 2 — Interval Expansion
+- Add quarterly and bi-annual options
+- Display savings badges on longer commitments
+
+### Phase 3 — Enhanced Billing UX
+- Embedded Stripe Elements (replace hosted Checkout for a seamless in-portal experience)
+- Proration on mid-cycle plan changes
+- Coupon/discount code entry at checkout
+- VAT/tax collection via Stripe Tax
+
+---
+
+## 14. Open Questions
+
+| Question | Owner | Status |
+|---|---|---|
+| Will there be a free trial period? If so, how many days? | Product | Open |
+| Should clients be able to self-serve upgrade/downgrade between plan tiers? | Product | Open |
+| What happens to a client's data after 30 days of cancelled subscription? | Product / Legal | Open |
+| Do we enable Stripe's smart dunning (automatic retry logic)? | Engineering | Recommended: Yes |
+| Should annual subscribers receive a prorated refund on cancellation? | Finance / Legal | Open |
+
+---
+
+## 15. Success Metrics
+
+- 100% of new clients onboard via Stripe (zero manual billing) within 60 days of launch
+- Payment failure rate < 5% of monthly renewals
+- < 2% involuntary churn attributable to billing failure (resolved via dunning)
+- Billing-related support tickets reduced by 80%
+- Average time to activate subscription < 3 minutes from plan selection

@@ -27,6 +27,7 @@ export default function LoginPage() {
       });
 
       if (error) {
+        console.error('Login error:', error);
         setError(error.message);
         setLoading(false);
         return;
@@ -37,7 +38,13 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      console.error('Unexpected login error:', err);
+      // Better error message for fetch failures
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError('Unable to connect to authentication service. Please check your internet connection and try again.');
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
       setLoading(false);
     }
   };
