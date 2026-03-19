@@ -678,7 +678,7 @@ export default function ProjectDetailPage() {
                   </a>
 
                   <Link
-                    href={`/messages?consultant=${encodeURIComponent(project.assignee)}`}
+                    href={`/inbox?projectId=${encodeURIComponent(project.id)}&consultantName=${encodeURIComponent(project.assignee || '')}`}
                     className="flex items-center gap-3 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     <MessageCircle className="h-4 w-4 text-gray-600" />
