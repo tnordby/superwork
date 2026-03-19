@@ -14,6 +14,16 @@ export interface ServiceTemplate {
   updated_at: string;
 }
 
+/** Active service rows for /projects Browse tab (server-fetched; matches lean `service_templates` select). */
+export interface ProjectsBrowseServiceRow {
+  id: string;
+  name: string;
+  category: string;
+  customer_description: string | null;
+  estimated_hours: number | null;
+  is_active: boolean;
+}
+
 // Service SOP (Internal Only)
 export interface ServiceSOP {
   id: string;
