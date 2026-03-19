@@ -1,0 +1,278 @@
+## PRD — Predefined Services, Briefs, SOPs, Tasks & Milestones
+
+**Priority:** 🔴 High  
+**Depends on:** Authentication & User Model, Projects, Kanban  
+**Status:** Core delivery system
+
+This PRD defines how **predefined Superwork services** are modeled, instantiated into projects, and executed through **SOPs, tasks, and milestones**, with clear visibility rules and progress tracking.
+
+---
+
+## 1. Purpose & Scope
+
+**Purpose**  
+Standardize HubSpot consulting delivery while preserving flexibility.
+
+Each predefined service must:
+- Have a clear, customer-facing brief
+- Be executed via internal SOPs and tasks
+- Surface progress transparently to customers
+- Allow consultants to adapt execution when needed
+
+This PRD governs:
+- Service templates
+- Project instantiation
+- SOP visibility
+- Task execution
+- Progress calculation
+- Phase (status) management
+
+---
+
+## 2. Core Concepts
+
+### 2.1 Predefined Service (Service Template)
+
+A **Predefined Service** is a repeatable consulting offering (e.g. “HubSpot CRM Setup”, “Lifecycle Stage Redesign”).
+
+Each service defines *what* is delivered and *how* it is delivered.
+
+---
+
+### 2.2 Project (Service Instance)
+
+A **Project** is a live instance of a predefined service (or a custom service) created by a customer.
+
+Projects:
+- Inherit structure from the service template
+- Are executed by providers using SOPs and tasks
+- Expose progress and milestones to customers
+
+---
+
+## 3. Visibility Model (Critical)
+
+| Element              | Customer | Provider | Admin |
+|----------------------|----------|----------|-------|
+| Project description  | ✅       | ✅       | ✅    |
+| SOPs                 | ❌       | ✅       | ✅    |
+| Tasks                | ✅       | ✅       | ✅    |
+| Task status updates  | ❌       | ✅       | ✅    |
+| Project phase change | ❌       | ✅       | ✅    |
+
+Customers see **what is happening**, not **how it is executed internally**.
+
+---
+
+## 4. Project Phases (Status)
+
+Projects move through fixed phases:
+
+- **Planning**
+- **In Progress**
+- **Review**
+- **Approval**
+- **Blocked**
+- **Completed**
+
+### Rules
+- Only **providers and admins** can change phases
+- Phase changes are logged (who, when, from → to)
+- Phase reflects delivery state, not task completion alone
+
+---
+
+## 5. Progress Calculation
+
+Project progress is **task-driven**.
+
+### Formula
+
+progress_percentage = completed_tasks / total_tasks * 100
+
+
+### Rules
+- All tasks (default + custom) count toward progress
+- Progress updates automatically
+- Customers see:
+  - A progress bar (percentage)
+  - No internal weighting logic
+
+### Example
+- 100 total tasks
+- 25 completed
+- Project progress = **25%**
+
+---
+
+## 6. Data Model (Supabase)
+
+### 6.1 Service Templates
+
+Defines predefined services.
+
+**Fields**
+- `id`
+- `name`
+- `customer_description` (visible to all)
+- `created_at`
+
+---
+
+### 6.2 Service SOPs
+
+Defines internal execution logic per service.
+
+**Fields**
+- `id`
+- `service_template_id`
+- `title`
+- `description`
+- `visibility = internal`
+- `created_at`
+
+SOPs are **never visible to customers**.
+
+---
+
+### 6.3 SOP Tasks (Template-Level)
+
+Defines default tasks for a service.
+
+**Fields**
+- `id`
+- `sop_id`
+- `title`
+- `description`
+- `order_index`
+- `is_required`
+- `created_at`
+
+These tasks are copied into a project on creation.
+
+---
+
+### 6.4 Projects (Existing, Extended)
+
+**Fields**
+- `id`
+- `organization_id`
+- `service_template_id` (nullable for custom projects)
+- `project_description` (customer-visible)
+- `status` (phase)
+- `progress_percentage`
+- `created_by_user_id`
+- `created_at`
+- `updated_at`
+
+---
+
+### 6.5 Project Tasks
+
+Represents executable tasks for a project.
+
+**Fields**
+- `id`
+- `project_id`
+- `title`
+- `description`
+- `status` (`not_started` | `in_progress` | `completed`)
+- `order_index`
+- `is_custom` (boolean)
+- `created_by_user_id`
+- `completed_at`
+- `created_at`
+
+---
+
+## 7. Task Execution Rules
+
+### Default Tasks
+- Created automatically from SOP when project is created
+- Can be deleted or be marked complete
+
+### Custom Tasks
+- Can be added by **providers and admins**
+- Used for:
+  - Edge cases
+  - Customer-specific requirements
+- Count toward progress
+
+Customers:
+- Can see custom tasks
+- Cannot edit or complete tasks
+
+---
+
+## 8. Milestones (Logical Grouping)
+
+Milestones are **logical groupings of tasks** (optional v1).
+
+### Example
+- Milestone: “CRM Foundation”
+  - Task 1
+  - Task 2
+  - Task 3
+
+Milestones:
+- Help customers understand progress
+- Do not affect progress math directly
+
+---
+
+## 9. Workflow Summary
+
+1. Superwork defines a service template
+2. Service has:
+   - Customer-facing description
+   - Internal SOP
+   - Default tasks
+3. Customer starts a project from service
+4. Project inherits tasks
+5. Provider executes tasks
+6. Progress updates automatically
+7. Provider moves project through phases
+8. Customer observes progress and milestones
+
+---
+
+## 10. Audit & Safety
+
+- All task status changes are logged
+- All phase changes are logged
+- Custom tasks record creator
+- Customers cannot mutate execution state
+
+---
+
+## 11. Explicit Non-Goals (v1)
+
+- No task weighting
+- No customer task completion
+- No custom phase definitions
+- No task dependencies or blocking logic
+- No SLA timers
+
+---
+
+## 12. Key Acceptance Criteria
+
+- Each predefined service has:
+  - Clear customer brief
+  - Hidden SOP
+  - Structured task list
+- Customers understand progress at a glance
+- Providers can execute consistently
+- Custom work does not break progress math
+- Phase control is safe and auditable
+
+---
+
+## 13. Definition of Done
+
+When this PRD is complete:
+- Predefined services can be created and reused
+- Projects inherit SOP-driven tasks
+- Progress is transparent and automatic
+- Consultants can adapt execution safely
+- The portal supports real HubSpot consulting delivery at scale

@@ -1,0 +1,219 @@
+---
+description: Product context and decision-making rules for Superwork
+alwaysApply: true
+---
+
+You are working on Superwork.
+
+Superwork is a client platform for a HubSpot consulting business.
+It is not generic SaaS — it is a structured delivery system for consulting.
+
+Your job is to help build a product that makes consulting feel:
+- organized
+- transparent
+- premium
+- scalable
+
+---
+
+## What Superwork is
+
+Superwork is a multi-tenant client portal where customers can:
+
+- submit and track requests and projects
+- communicate with consultants in context
+- upload and access assets and deliverables
+- understand billing, invoices, and usage
+- manage their team within their organization
+
+It also supports internal users:
+
+- providers (consultants, CSMs)
+- admins (platform operators)
+
+Superwork sits on top of HubSpot — it does not replace it.
+
+---
+
+## Core product goal
+
+Turn a messy consulting experience into a structured product.
+
+That means:
+- less email
+- less confusion
+- fewer status questions
+- clearer value delivery
+- easier scaling internally
+
+---
+
+## Primary user types
+
+### Customer
+A client of the consulting business.
+
+They care about:
+- “What is being done?”
+- “What has been delivered?”
+- “What do I need to do?”
+- “What am I paying for?”
+
+They are not technical.
+
+---
+
+### Provider
+A consultant or account manager.
+
+They care about:
+- what work is assigned
+- how to communicate clearly with customers
+- delivering work consistently
+- reducing back-and-forth
+
+---
+
+### Admin
+Internal operator.
+
+They care about:
+- controlling access
+- fixing issues
+- overseeing customers and usage
+- maintaining system integrity
+
+---
+
+## Product principles
+
+### 1. Clarity over complexity
+Users should understand what is happening immediately.
+
+Avoid:
+- unclear states
+- hidden actions
+- confusing flows
+
+---
+
+### 2. Calm, premium experience
+The product should feel structured and trustworthy.
+
+Avoid:
+- noisy UI
+- unnecessary animations
+- cluttered screens
+
+---
+
+### 3. Context over scattered communication
+All communication should live near the work it relates to.
+
+Avoid:
+- generic chat systems detached from projects
+- losing context across tools
+
+---
+
+### 4. Transparency builds trust
+Customers should always understand:
+- project status
+- progress
+- deliverables
+- billing and usage
+
+Avoid:
+- black-box processes
+- hidden costs
+- unclear progress
+
+---
+
+### 5. Standardization over customization
+The system should scale across many customers.
+
+Avoid:
+- one-off solutions
+- per-customer logic unless absolutely necessary
+
+---
+
+### 6. Internal complexity stays internal
+Customers should not see:
+- SOPs
+- internal notes
+- internal statuses
+- operational complexity
+
+---
+
+## What to prioritize when building
+
+Always prioritize:
+
+1. tenant safety (multi-tenant correctness)
+2. clear customer experience
+3. real working features over UI polish
+4. simplicity over flexibility
+5. consistency across the product
+
+---
+
+## What NOT to build (by default)
+
+Avoid building:
+
+- features that only serve internal convenience without customer value
+- complex abstractions for future use cases
+- deep customization per customer
+- generic “platform features” without clear use
+- overly advanced real-time systems unless necessary
+- anything that duplicates HubSpot functionality unnecessarily
+
+---
+
+## Feature decision framework
+
+When evaluating a feature, ask:
+
+1. Does this reduce chaos for the customer?
+2. Does this improve clarity or transparency?
+3. Does this help us scale delivery internally?
+4. Is this understandable to a non-technical user?
+5. Can this work for many customers without customization?
+
+If the answer is no to most of these → do not build it.
+
+---
+
+## How to think when implementing
+
+Always think like:
+
+- a CTO → for structure and tradeoffs
+- a product manager → for user clarity
+- a consultant → for real-world workflows
+- a founder → for speed and focus
+
+---
+
+## Output expectations
+
+When proposing or building features:
+
+- explain decisions briefly
+- prefer simple implementations
+- avoid overengineering
+- call out tradeoffs
+- identify what is intentionally not included
+
+---
+
+## Summary mindset
+
+Superwork is not trying to be everything.
+
+It is trying to be:
+
+> the clean, structured layer that makes a consulting relationship feel like a product.

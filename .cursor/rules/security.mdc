@@ -1,0 +1,120 @@
+---
+description: Security and permission rules for Superwork
+alwaysApply: true
+---
+
+You are responsible for protecting Superwork's tenant boundaries, customer data, internal data, and operational integrity.
+
+Superwork is a multi-tenant platform with customer users, provider users, and admin users.
+Security is a product requirement, not a cleanup task.
+
+## Core security principles
+
+- Never trust client-side authorization.
+- Enforce permissions server-side.
+- Apply least privilege by default.
+- Make tenant boundaries explicit.
+- Protect database access and file access equally.
+- Treat internal notes, internal messages, admin controls, and provider-only data as sensitive.
+- Prefer safe defaults and explicit checks over convenience.
+
+## Identity and access rules
+
+- Authentication identifies the user.
+- Organization membership determines tenant access.
+- Role determines allowed actions within that tenant or system area.
+- Every sensitive action must answer:
+  1. who is acting
+  2. what organization the resource belongs to
+  3. what role the actor has
+  4. whether the action is allowed
+
+## Role model
+
+Primary user types:
+- customer
+- provider
+- admin
+
+Customer membership roles may include:
+- admin
+- member
+- viewer
+
+Rules:
+- customers may only access their own organization’s allowed data
+- providers may only access assigned or explicitly authorized customer data
+- admins may access platform-level controls, but should still use explicit checks
+- internal-only data must never appear in customer-facing responses
+
+## Database security rules
+
+- Respect and preserve row-level security assumptions.
+- Scope all queries by authenticated identity and organization membership.
+- Never fetch broad data and filter it only in the client.
+- Never assume route protection alone is enough.
+- Never return columns or joined data the role should not see.
+- Audit sensitive write paths carefully.
+
+## Storage and asset security rules
+
+- File access must be tenant-aware.
+- Do not expose raw storage paths or signed URLs without authorization checks.
+- Customer-uploaded and provider-uploaded assets must respect organization boundaries.
+- Internal-only deliverables or files must not be accessible to customers.
+- Treat file previews and downloads as protected operations.
+
+## Messaging and internal data rules
+
+- Internal messages must be explicitly marked and protected.
+- Customer-facing message queries must exclude internal content by design.
+- Internal notes, operational comments, and admin-only flags must never be accidentally bundled into customer-visible payloads.
+- Do not rely on UI hiding to protect internal information.
+
+## Billing and sensitive data rules
+
+- Billing data must be visible only to allowed users in the correct organization.
+- Usage and invoice data should be scoped carefully.
+- Do not expose payment-related details beyond what the intended role needs.
+- Financial views must be treated as trust-critical surfaces.
+
+## Secure implementation expectations
+
+For any auth-sensitive feature, always state:
+1. who can read
+2. who can create
+3. who can update
+4. who can delete
+5. what tenant or organization boundary applies
+6. whether there is any internal-only data involved
+
+## Safe coding expectations
+
+- Validate all external inputs.
+- Fail safely.
+- Avoid leaking internal implementation details in errors.
+- Keep logs useful but do not log secrets or sensitive payloads unnecessarily.
+- Be careful with signed URLs, tokens, session data, and admin actions.
+
+## Red flags
+
+Treat these as serious problems:
+- client-only role checks
+- missing organization filters
+- broad queries with frontend filtering
+- shared endpoints returning mixed internal and customer data
+- signed file URLs created without authorization checks
+- provider/admin data leakage into customer views
+- weak invite flows
+- unrestricted membership changes
+- insecure admin overrides
+- unclear ownership of records
+
+## Security mindset
+
+Always think:
+- Could this leak data across tenants?
+- Could this expose internal data to customers?
+- Could this let the wrong role perform the action?
+- Is the system relying on the UI instead of the backend for safety?
+- What is the safest simple implementation?

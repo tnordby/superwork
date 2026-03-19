@@ -1,0 +1,197 @@
+## PRD — Quoting & Approval Workflow
+
+**Priority:** 🔴 High  
+**Depends on:** Authentication, Organizations, Projects, Quotes  
+**Status:** Core commercial + delivery handoff
+
+This PRD extends the **quoting process** to include **consultant assignment**, ensuring that every approved quote transitions cleanly into an owned, executable project.
+
+---
+
+## 1. Purpose of This Extension
+
+Once a quote is approved, the next operational risk is **unclear ownership**.
+
+This extension ensures:
+- Every project has a responsible consultant before work starts
+- PMs retain control over who delivers what
+- Customers know *who* is working on their project
+- Providers are not surprised by new work
+
+---
+
+## 2. New Capability: Consultant Assignment
+
+### Core Principle
+
+> **A project cannot start without an assigned consultant.**
+
+Consultant assignment is part of the **PM approval workflow**, not an afterthought.
+
+---
+
+## 3. Updated Quote → Project Flow
+
+### End-to-End Flow (Updated)
+
+Customer → PM → Consultant → Execution
+
+1. Customer requests service (predefined or custom)
+2. Quote is created (`pending_pm_review`)
+3. PM reviews request and pricing
+4. **PM assigns one or more consultants**
+5. PM sends quote to customer
+6. Customer approves quote
+7. Project becomes active with:
+   - Approved scope
+   - Locked price
+   - Assigned consultant(s)
+8. Consultant receives notification and can begin work
+
+---
+
+## 4. PM Consultant Assignment Flow
+
+### 4.1 When Assignment Happens
+
+Consultants are assigned:
+- During PM quote review
+- Before the quote is sent to the customer
+- Or after customer approval but **before project moves to `planned`**
+
+**Rule**
+- A project cannot move to `planned` or `in_progress` unless at least one consultant is assigned
+
+---
+
+### 4.2 Assignment UI (Conceptual)
+
+PM sees:
+- List of available consultants
+- Consultant role (e.g. Lead, Contributor)
+- Optional internal note (“Context for consultant”)
+
+PM can:
+- Assign one primary consultant (required)
+- Assign additional contributors (optional)
+- Change assignments before project start
+
+---
+
+## 5. Consultant Roles
+
+Each consultant assigned to a project has a role:
+
+- **Lead**
+  - Primary owner
+  - Responsible for delivery and updates
+- **Contributor**
+  - Supports execution
+  - No ownership responsibility
+
+Roles affect visibility and responsibility, not permissions (v1).
+
+---
+
+## 6. Data Model Extensions
+
+### 6.1 Project Assignments (Existing / Extended)
+
+**Table:** `project_assignments`
+
+**Fields**
+- `id`
+- `project_id`
+- `user_id` (consultant / provider)
+- `role` (`lead` | `contributor`)
+- `assigned_by_user_id` (PM)
+- `assigned_at`
+
+---
+
+### 6.2 Quote (Minor Extension)
+
+**Quotes table**
+- `assigned_lead_user_id` (nullable until assignment)
+- `assignment_locked` (boolean)
+
+When a quote is approved:
+- `assignment_locked = true`
+- Assigned consultants cannot be changed without admin override
+
+---
+
+## 7. Consultant Experience
+
+When assigned to a project:
+- Consultant receives notification
+- Project appears in their workspace
+- SOP and task list become available
+- Consultant can begin execution immediately once project is active
+
+Consultants **cannot**:
+- Change quote price
+- Reassign ownership
+- Modify scope without PM/admin involvement
+
+---
+
+## 8. Customer Visibility
+
+Customers can see:
+- Assigned consultant(s)
+- Primary contact (Lead)
+- Role labels (e.g. “Project Lead”)
+
+Customers **cannot**:
+- Change assignments
+- Assign consultants themselves
+
+---
+
+## 9. Permissions & Safety Rules
+
+- Only PMs and admins can assign consultants
+- Providers cannot assign themselves
+- Assignment changes are logged
+- Assignment is required before project start
+
+---
+
+## 10. Notifications
+
+- Consultant notified when:
+  - Assigned to a project
+- Customer notified when:
+  - Project is approved and assigned (optional v1)
+- PM notified if:
+  - Project is approved but unassigned (blocking state)
+
+---
+
+## 11. Explicit Non-Goals (v1)
+
+- No automatic consultant matching
+- No load-balancing logic
+- No skill-based routing
+- No customer-selected consultants
+
+---
+
+## 12. Key Acceptance Criteria
+
+- Every approved project has a named owner
+- PMs control delivery ownership
+- Consultants always know what they are responsible for
+- Customers know who is working on their project
+- No project enters execution unassigned
+
+---
+
+## 13. Definition of Done
+
+When this extension is complete:
+- Quoting, approval, and delivery form a single coherent flow
+- Ownership is explicit from day one
+- The handoff from sales/PM to consultant is frictionless
+- Execution starts cleanly, not reactively

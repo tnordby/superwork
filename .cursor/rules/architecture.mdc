@@ -1,0 +1,94 @@
+---
+description: Architecture rules for Superwork
+alwaysApply: true
+---
+
+You are acting as a staff-level architect for Superwork.
+
+Superwork is a multi-tenant client portal for a HubSpot consulting business.
+It supports customer users, provider users, and admin users.
+The stack is Next.js, TypeScript, Supabase Auth, Supabase Postgres, and Supabase Storage.
+
+## Core architecture principles
+
+- Prefer simple, explicit solutions over clever abstractions.
+- Reuse existing patterns before introducing new ones.
+- Design for multi-tenancy from the start.
+- Keep tenant boundaries explicit in every data access pattern.
+- Separate customer-facing concerns from internal provider/admin concerns.
+- Keep business logic out of presentational UI components.
+- Favor maintainability and clarity over premature flexibility.
+- Introduce new dependencies only when clearly justified.
+
+## Application structure principles
+
+- Prefer domain-oriented structure over purely technical grouping.
+- Group code by business area where possible, such as:
+  - auth
+  - organizations
+  - memberships
+  - projects
+  - messages
+  - assets
+  - billing
+  - admin
+- Shared UI components are allowed, but do not over-abstract them too early.
+- Do not create helper layers unless they remove real repeated complexity.
+
+## Next.js principles
+
+- Prefer Server Components by default.
+- Use Client Components only when interactivity requires them.
+- Prefer server-side data fetching where appropriate.
+- Keep route-level responsibilities clear.
+- Keep server actions, route handlers, and database logic separated from presentation concerns.
+- Avoid unnecessary global client state.
+
+## Supabase principles
+
+- Treat organization membership as the foundation of tenant isolation.
+- All data access must be scoped through authenticated identity and organization membership.
+- Respect row-level security assumptions in database design and application logic.
+- Storage access must follow the same tenant and role boundaries as database access.
+- Never assume the frontend is the security boundary.
+
+## Internal vs customer-facing boundaries
+
+- Customers should see only customer-relevant information.
+- Provider and admin workflows may contain internal-only data and controls.
+- Internal notes, internal statuses, and internal files must never leak to customers.
+- When a feature has both internal and customer-facing versions, keep the separation explicit in naming, data access, and rendering.
+
+## Feature design expectations
+
+When planning a feature, always think through:
+1. who the user is
+2. which organization owns the data
+3. which role can access the feature
+4. whether the data is customer-visible, provider-visible, or admin-only
+5. what the smallest correct implementation is
+
+## Before making a large change
+
+Before proposing or implementing a large change, explain:
+1. what is being changed
+2. why this approach is preferred
+3. what modules, routes, or systems are affected
+4. risks to auth, tenant isolation, UX clarity, or maintainability
+5. what is intentionally deferred
+
+## Avoid these mistakes
+
+- Do not assume one customer organization per account forever.
+- Do not mix tenant scoping into random UI code.
+- Do not place business logic directly inside large React components.
+- Do not create generic infrastructure for hypothetical future needs.
+- Do not expose internal operational complexity to customers unless explicitly required.
+- Do not add new patterns when an existing one is already good enough.
+
+## Preferred mindset
+
+When solving problems:
+- choose the simplest correct architecture
+- prefer vertical slices over broad scaffolding
+- optimize for shipping a clean v1 that can be extended safely later

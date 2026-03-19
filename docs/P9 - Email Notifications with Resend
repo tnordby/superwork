@@ -1,0 +1,432 @@
+# PRD: Transactional Email Notifications via Resend
+
+## Product
+Superwork – Client Portal
+
+## Feature Name
+Transactional Email Notifications
+
+## Status
+Proposed
+
+## Owner
+Superwork Product
+
+## Last Updated
+2026-02-19
+
+---
+
+## 1. Problem Statement
+
+Superwork currently has no systematic, branded email notification layer. Key platform events — new user signups, project updates, billing changes, consultant assignments — either go uncommunicated or are handled manually via personal email.
+
+This creates:
+- Poor onboarding experience for new clients and consultants
+- Missed handoffs between clients and consultants
+- No automated recovery path for account events (password reset, failed payments)
+- Inconsistent communication that doesn't reinforce the Superwork brand
+- Clients and consultants operating without timely, relevant context
+
+---
+
+## 2. Goal
+
+Implement a fully branded, event-driven transactional email system using **Resend**, covering every significant lifecycle event across the Superwork platform for both clients and consultants.
+
+All emails must:
+- Be delivered reliably via Resend's API
+- Render consistently across major email clients (Gmail, Outlook, Apple Mail)
+- Follow Superwork's brand identity (colors, typography, tone)
+- Be templated using **React Email** for maintainability
+- Be logged for auditing and debugging
+
+---
+
+## 3. Non-Goals
+
+This feature will **not**:
+- Replace in-app notifications (a separate feature)
+- Handle bulk marketing or newsletter campaigns (HubSpot will be used for this)
+- Support SMS or push notifications (future phase)
+- Allow clients or consultants to configure their own notification preferences at launch (Phase 2)
+- Support multi-language email templates at launch
+
+---
+
+## 4. Brand Specifications
+
+All email templates must adhere to the following Superwork design tokens:
+
+### Color Palette
+
+| Token | Hex | Usage in Email |
+|---|---|---|
+| Midnight/500 | `#1c1e31` | Email header background, footer background |
+| Midnight/600 | `#151726` | Deep section backgrounds |
+| Green/500 | `#bfe937` | Primary CTA buttons, highlight accents |
+| Green/700 | `#99bf2e` | Button hover state (where supported) |
+| Violet/500 | `#6a6dcd` | Secondary accents, info badges |
+| White | `#ffffff` | Email body background, body text on dark |
+| Neutral/400 | `#8f8f8f` | Secondary body text, metadata, timestamps |
+| Neutral/200 | `#ebebeb` | Dividers, borders, subtle section backgrounds |
+| Neutral/900 | `#000000` | Primary body text on white backgrounds |
+
+### Typography
+- **Font**: Inter (with Arial, sans-serif fallback for Outlook)
+- **Heading**: 22px, bold, `#ffffff` on dark headers / `#1c1e31` on light body
+- **Body**: 16px, regular, `#000000` on white / `#ffffff` on dark
+- **Secondary text**: 14px, `#8f8f8f`
+- **CTA Button**: 16px, bold, background `#bfe937`, text `#1c1e31`, border-radius 6px, padding 14px 28px
+
+### Layout
+- Max width: 600px, centered
+- Header: Superwork logo on `#1c1e31` background
+- Body: white background, 32px padding
+- Footer: `#1c1e31` background, secondary links, unsubscribe (where required by law)
+- All emails must include a plain-text fallback
+
+---
+
+## 5. User Roles
+
+### Client
+Receives emails related to their account, billing, projects, and consultant activity.
+
+### Consultant
+Receives emails related to client assignments, project activity, and platform events.
+
+### Admin (Internal)
+Receives digest and alert emails for critical platform events.
+
+---
+
+## 6. Notification Inventory
+
+### 6.1 Authentication & Account
+
+| ID | Trigger | Recipient | Subject Line |
+|---|---|---|---|
+| AUTH-01 | New client account created | Client | Welcome to Superwork — let's get started |
+| AUTH-02 | New consultant account created | Consultant | Welcome to Superwork — your account is ready |
+| AUTH-03 | Password reset requested | Client / Consultant | Reset your Superwork password |
+| AUTH-04 | Password successfully changed | Client / Consultant | Your password has been updated |
+| AUTH-05 | Email address changed | Client / Consultant | Your email address has been updated |
+| AUTH-06 | Login from new device / location | Client / Consultant | New sign-in detected on your account |
+
+---
+
+### 6.2 Client Onboarding
+
+| ID | Trigger | Recipient | Subject Line |
+|---|---|---|---|
+| ONB-01 | Account created (day 0) | Client | Welcome to Superwork — here's how to get set up |
+| ONB-02 | Day 2 nudge — portal incomplete | Client | Your Superwork portal is ready — a few things to complete |
+| ONB-03 | First consultant assigned | Client | Meet your Superwork consultant |
+| ONB-04 | First project created | Client | Your first project is live on Superwork |
+| ONB-05 | Onboarding call scheduled | Client | Your onboarding call is confirmed |
+
+---
+
+### 6.3 Consultant Onboarding
+
+| ID | Trigger | Recipient | Subject Line |
+|---|---|---|---|
+| CON-01 | Consultant account approved | Consultant | Your Superwork consultant account is approved |
+| CON-02 | First client assigned | Consultant | You've been assigned a new client |
+| CON-03 | Consultant profile incomplete after 48h | Consultant | Complete your Superwork profile |
+
+---
+
+### 6.4 Client & Project Management
+
+| ID | Trigger | Recipient | Subject Line |
+|---|---|---|---|
+| PROJ-01 | New client added to platform | Assigned Consultant(s) | New client assigned: [Client Name] |
+| PROJ-02 | New project created | Client + Consultant | New project created: [Project Name] |
+| PROJ-03 | Project status changed | Client + Consultant | Project update: [Project Name] is now [Status] |
+| PROJ-04 | Project marked complete | Client | Your project [Project Name] has been completed |
+| PROJ-05 | Task assigned to consultant | Consultant | New task assigned: [Task Name] |
+| PROJ-06 | Task marked complete by consultant | Client | Task completed: [Task Name] |
+| PROJ-07 | Client uploads asset to library | Assigned Consultant(s) | New asset uploaded by [Client Name] |
+| PROJ-08 | Consultant uploads deliverable | Client | New deliverable available: [File Name] |
+| PROJ-09 | Project deadline approaching (48h) | Client + Consultant | Reminder: [Project Name] is due in 48 hours |
+| PROJ-10 | Project deadline missed | Client + Consultant + Admin | Overdue: [Project Name] has passed its deadline |
+
+---
+
+### 6.5 Messaging & Collaboration
+
+| ID | Trigger | Recipient | Subject Line |
+|---|---|---|---|
+| MSG-01 | New message received (client → consultant) | Consultant | New message from [Client Name] |
+| MSG-02 | New message received (consultant → client) | Client | New message from your Superwork consultant |
+| MSG-03 | Message unread for 24h | Sender's counterpart | Reminder: you have an unread message on Superwork |
+
+---
+
+### 6.6 Billing & Subscription
+
+| ID | Trigger | Recipient | Subject Line |
+|---|---|---|---|
+| BILL-01 | Subscription activated (first payment) | Client | You're subscribed — welcome to [Plan Name] |
+| BILL-02 | Invoice paid (recurring) | Client | Your Superwork invoice for [Month] is paid |
+| BILL-03 | Payment failed | Client | Action required: your Superwork payment failed |
+| BILL-04 | Payment failed (final retry) | Client + Admin | Final notice: your Superwork subscription is at risk |
+| BILL-05 | Subscription upgraded | Client | You've upgraded to [New Plan Name] |
+| BILL-06 | Subscription downgraded | Client | Your plan has been updated to [New Plan Name] |
+| BILL-07 | Subscription cancelled by client | Client + Admin | Your Superwork subscription has been cancelled |
+| BILL-08 | Subscription cancelled — win-back (day 3) | Client | We'd love to have you back |
+| BILL-09 | Subscription expires / grace period warning | Client | Your Superwork access expires in [X] days |
+| BILL-10 | Subscription fully lapsed | Client | Your Superwork account has been paused |
+| BILL-11 | Annual renewal reminder (30 days out) | Client | Your Superwork annual plan renews on [Date] |
+| BILL-12 | Coupon / discount applied | Client | A discount has been applied to your account |
+
+---
+
+### 6.7 Admin & Internal Alerts
+
+| ID | Trigger | Recipient | Subject Line |
+|---|---|---|---|
+| ADMIN-01 | New client signs up | Admin | New client signup: [Client Name] |
+| ADMIN-02 | Subscription cancelled | Admin | Churn alert: [Client Name] has cancelled |
+| ADMIN-03 | Payment fails (any client) | Admin | Payment failure: [Client Name] — action may be needed |
+| ADMIN-04 | Consultant has no active client for 7 days | Admin | Idle consultant: [Consultant Name] |
+| ADMIN-05 | Project overdue | Admin | Overdue project: [Project Name] — [Client Name] |
+| ADMIN-06 | Weekly platform digest | Admin | Superwork Weekly: [Date Range] |
+
+---
+
+## 7. Email Template Architecture
+
+### Tech Stack
+- **Email rendering**: React Email (`@react-email/components`)
+- **Delivery**: Resend API (`resend` npm package)
+- **Template storage**: `/emails/` directory in the Superwork monorepo
+- **Preview & testing**: React Email dev server (`email.dev`)
+
+### Directory Structure
+
+```
+/emails
+  /components
+    Header.tsx           # Logo + Midnight/500 background
+    Footer.tsx           # Links + unsubscribe + #1c1e31 background
+    Button.tsx           # Green/500 CTA button
+    Divider.tsx          # Neutral/200 horizontal rule
+    Badge.tsx            # Violet/500 status badges
+  /templates
+    /auth
+      welcome-client.tsx
+      welcome-consultant.tsx
+      password-reset.tsx
+      password-changed.tsx
+      email-changed.tsx
+      new-device-login.tsx
+    /onboarding
+      onboarding-day0.tsx
+      onboarding-day2-nudge.tsx
+      consultant-assigned.tsx
+    /projects
+      new-client-assigned.tsx
+      new-project.tsx
+      project-status-changed.tsx
+      project-complete.tsx
+      task-assigned.tsx
+      task-complete.tsx
+      deadline-reminder.tsx
+      deadline-missed.tsx
+    /billing
+      subscription-activated.tsx
+      invoice-paid.tsx
+      payment-failed.tsx
+      payment-failed-final.tsx
+      subscription-cancelled.tsx
+      win-back.tsx
+      renewal-reminder.tsx
+    /admin
+      new-client-signup.tsx
+      churn-alert.tsx
+      weekly-digest.tsx
+```
+
+### Shared Component: Base Layout
+
+Every template wraps content in a consistent shell:
+
+```tsx
+<Html>
+  <Head />
+  <Preview>{previewText}</Preview>
+  <Body style={{ backgroundColor: '#ffffff', fontFamily: 'Inter, Arial, sans-serif' }}>
+    <Container maxWidth="600px">
+      <Header />          {/* Logo on #1c1e31 */}
+      <Section>           {/* White body, 32px padding */}
+        {children}
+      </Section>
+      <Footer />          {/* Links on #1c1e31 */}
+    </Container>
+  </Body>
+</Html>
+```
+
+### Shared Component: CTA Button
+
+```tsx
+<Button
+  href={ctaUrl}
+  style={{
+    backgroundColor: '#bfe937',
+    color: '#1c1e31',
+    fontWeight: 'bold',
+    fontSize: '16px',
+    padding: '14px 28px',
+    borderRadius: '6px',
+    textDecoration: 'none',
+    display: 'inline-block',
+  }}
+>
+  {ctaLabel}
+</Button>
+```
+
+---
+
+## 8. Sending Architecture
+
+### Resend Integration
+
+```typescript
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+export async function sendEmail({
+  to,
+  subject,
+  template,
+}: {
+  to: string;
+  subject: string;
+  template: React.ReactElement;
+}) {
+  const { data, error } = await resend.emails.send({
+    from: 'Superwork <notifications@mail.superwork.com>',
+    to,
+    subject,
+    react: template,
+  });
+
+  if (error) {
+    console.error('Resend error:', error);
+    throw new Error(`Failed to send email: ${error.message}`);
+  }
+
+  return data;
+}
+```
+
+### Sending Domain
+- **From address**: `notifications@mail.superwork.com`
+- **Reply-to**: `support@superwork.com`
+- DNS records (SPF, DKIM, DMARC) must be configured in Resend before go-live.
+
+### Trigger Points
+
+Emails are triggered from three layers:
+
+| Layer | Examples |
+|---|---|
+| **Supabase Database Webhooks** | New user created, project status changed |
+| **Stripe Webhooks** | Payment failed, subscription cancelled |
+| **API Route Handlers** | Password reset, manual admin triggers |
+
+Each trigger calls a shared `sendEmail()` utility with the appropriate template and recipient.
+
+---
+
+## 9. Logging & Observability
+
+- All sent emails are logged to a `email_logs` table in Supabase:
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | `uuid` | Primary key |
+| `recipient_email` | `text` | Recipient address |
+| `template_id` | `text` | e.g. `AUTH-01`, `BILL-03` |
+| `subject` | `text` | Email subject line |
+| `status` | `text` | `sent`, `failed`, `bounced` |
+| `resend_id` | `text` | Resend message ID for tracking |
+| `created_at` | `timestamptz` | Timestamp |
+| `metadata` | `jsonb` | Context payload (project ID, client ID, etc.) |
+
+- Resend's webhook can be consumed at `POST /api/resend/webhook` to update `status` with delivery events (`delivered`, `bounced`, `complained`).
+
+---
+
+## 10. Error Handling
+
+| Scenario | Handling |
+|---|---|
+| Resend API unavailable | Retry up to 3 times with exponential backoff; log failure |
+| Invalid recipient email | Log error, do not retry, flag in admin dashboard |
+| Template rendering error | Catch at build/send time, send plain-text fallback |
+| Bounce received | Mark email as `bounced` in logs, flag client/consultant record |
+| Spam complaint received | Suppress future emails to that address, notify admin |
+
+---
+
+## 11. Notification Preference Centre (Phase 2)
+
+In Phase 2, clients and consultants will be able to manage their notification preferences from within the portal:
+
+- Toggle individual notification categories on/off (e.g. task updates, billing reminders)
+- Choose digest frequency for non-urgent notifications (immediate / daily / weekly)
+- Unsubscribe from non-essential emails without unsubscribing from account-critical ones (password reset, billing alerts are always sent)
+
+Preferences will be stored in a `notification_preferences` table in Supabase and checked before each send.
+
+---
+
+## 12. Testing & QA
+
+- React Email dev server used for visual preview of all templates during development
+- Each template tested across: Gmail (web), Gmail (mobile), Apple Mail, Outlook 2019
+- Use Resend's test mode (sandbox) during development — emails route to test inbox only
+- End-to-end tests for critical flows: password reset, subscription cancelled, payment failed
+
+---
+
+## 13. Phased Rollout
+
+### Phase 1 — Critical Path (Launch Blockers)
+AUTH-01 through AUTH-06, ONB-01, ONB-03, BILL-01 through BILL-04, BILL-07, ADMIN-01 through ADMIN-03
+
+### Phase 2 — Full Operational Coverage
+All PROJ-xx, MSG-xx, CON-xx, and remaining BILL-xx and ONB-xx notifications
+
+### Phase 3 — Intelligence & Preferences
+Notification preference centre, digest emails, win-back sequences, weekly admin digest
+
+---
+
+## 14. Open Questions
+
+| Question | Owner | Status |
+|---|---|---|
+| What subdomain should be used for sending? (`mail.superwork.com` or `notifications.superwork.com`) | Engineering | Open |
+| Should win-back emails (BILL-08) be a sequence (day 3, day 7, day 14) or a single send? | Product | Open |
+| Do consultants receive billing-related emails or only client-facing billing events? | Product | Open |
+| Should admin alerts go to a shared inbox (e.g. `alerts@superwork.com`) or specific team members? | Ops | Open |
+| Is there a legal requirement to include an unsubscribe link on transactional emails in target markets? | Legal | Open |
+
+---
+
+## 15. Success Metrics
+
+- 100% of critical lifecycle events (auth, billing, project) trigger an email within 30 seconds of the event
+- Email delivery rate ≥ 98%
+- Bounce rate < 2%
+- Spam complaint rate < 0.1%
+- Password reset email open rate ≥ 80% (benchmark for transactional)
+- Subscription cancellation win-back conversion ≥ 5%

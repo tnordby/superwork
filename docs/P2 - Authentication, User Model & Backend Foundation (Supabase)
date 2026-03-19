@@ -1,0 +1,356 @@
+## PRD — Authentication, User Model & Backend Foundation (Supabase)
+
+**Priority:** 🔴 High  
+**Status:** Foundational (must be implemented before dynamic portal features)
+
+This PRD defines how users authenticate, how identities and organizations are modeled, and how backend data is structured so the Superwork portal moves from a static mockup to a real, multi-tenant HubSpot consulting platform.
+
+---
+
+## 1. Purpose & Scope
+
+**Purpose**  
+Enable real users, real organizations, real permissions, and real data in the Superwork customer portal.
+
+Without this PRD:
+- The portal is only a visual mockup
+- No customer data is trustworthy
+- Projects, billing, communication, and assets cannot function
+
+This PRD intentionally combines **authentication, user model, organization model, and core backend schema**, because these are inseparable in a multi-organization consulting platform.
+
+---
+
+## 2. User Types (Non-Negotiable)
+
+The platform supports **three user types**, each with distinct access patterns.
+
+### 2.1 Customer
+- Belongs to **one customer organization**
+- Can invite colleagues into the same organization
+- Can:
+  - View subscription, balance, usage, and invoices
+  - View and comment on projects
+  - Access delivered assets
+- Cannot:
+  - See other customer organizations
+  - Access internal SOPs or admin tools
+
+### 2.2 Provider (Consultant / CSM / Account Manager)
+- Belongs to **Superwork**
+- Can be assigned to **multiple customer organizations**
+- Can:
+  - Manage and update projects
+  - Communicate with customers
+  - Upload deliverables
+- Cannot:
+  - Access platform-wide admin configuration
+  - Modify customer billing unless explicitly allowed
+
+### 2.3 Admin
+- Belongs to **Superwork**
+- Full platform access
+- Can:
+  - Create and manage customer organizations
+  - Add customer and provider users
+  - Override access and data
+  - Manage platform-level configuration
+
+---
+
+## 3. Authentication (Supabase Auth)
+
+### 3.1 Authentication Method
+- Supabase Auth
+- Email + password login
+- Password reset via email
+- Session-based authentication (JWT handled by Supabase)
+
+### 3.2 Session Management Requirements
+- Persistent sessions across browser refresh
+- Automatic token refresh
+- Server-side session access for protected routes
+- Secure logout
+
+**Acceptance criteria**
+- Users are not logged out unexpectedly
+- Invalid sessions immediately revoke access
+- Session state is available both client- and server-side
+
+---
+
+## 4. Signup & Onboarding Flows
+
+### 4.1 Self-Service Customer Signup (Public Website)
+
+**Primary path for product-led growth**
+
+**Flow**
+1. User signs up via the Superwork website
+2. Supabase Auth creates the user
+3. A **new customer organization** is automatically created
+4. The user becomes:
+   - `user_type = customer`
+   - `organization_role = admin`
+5. User is redirected to portal onboarding
+
+**Rules**
+- One organization per self-service signup
+- No automatic provider assignment
+- Default plan state: trial / inactive (defined in billing PRD)
+
+---
+
+### 4.2 Admin-Created Customer Account
+
+**Used for sales-led or enterprise onboarding**
+
+**Flow**
+1. Admin creates organization
+2. Admin invites initial customer user
+3. User completes signup via invite
+4. User lands directly in the portal
+
+---
+
+### 4.3 Customer Invites (Colleagues)
+
+**Used after organization exists**
+
+**Flow**
+1. Customer admin invites colleague
+2. Invite link creates user inside same organization
+3. Role assigned at invite (`admin`, `member`, `viewer`)
+
+**Rules**
+- Only customer admins can invite
+- Invites never create new organizations
+
+---
+
+### 4.4 Provider Signup
+
+- Admin-only
+- Providers cannot self-register
+- Providers may belong to multiple customer organizations
+
+---
+
+### 4.5 Admin Signup
+
+- No public admin signup
+- Seeded manually or via internal tooling
+
+---
+
+## 5. Protected Routes & Access Control
+
+### Principles
+- Never trust client-side role checks
+- Enforce permissions server-side
+- Scope all data by organization membership
+
+### Conceptual Route Groups
+- `/portal/*` → authenticated users
+- `/portal/customer/*` → customers + providers (scoped)
+- `/portal/internal/*` → providers + admins
+- `/portal/admin/*` → admins only
+
+**Acceptance criteria**
+- Customers cannot access internal or admin routes
+- Providers cannot access admin routes
+- Users can only access organizations they belong to
+
+---
+
+## 6. Core Data Model (Supabase Database)
+
+### 6.1 Organizations (Companies)
+
+Represents a **customer company** or **Superwork** itself.
+
+**Fields**
+- `id` (UUID, PK)
+- `name`
+- `type` (`customer` | `superwork`)
+- `domain` (e.g. `company.com`)
+- `website_url` (e.g. `https://company.com`)
+- `country` (ISO-2 or ISO-3, e.g. `NO`, `SE`, `US`)
+- `created_at`
+
+**Intent**
+- Root entity for billing, projects, access control
+- Enables future domain verification and enrichment
+
+---
+
+### 6.2 Users
+
+Represents an authenticated person.
+
+**Fields**
+- `id` (matches Supabase auth user id)
+- `email`
+- `name`
+- `user_type` (`customer` | `provider` | `admin`)
+- `created_at`
+- `last_login_at`
+
+Auth credentials live in Supabase Auth; profile data lives here.
+
+---
+
+### 6.3 Organization Memberships (Critical)
+
+Enables:
+- Customers inviting colleagues
+- Providers working across multiple customers
+
+**Fields**
+- `id`
+- `user_id`
+- `organization_id`
+- `role` (`admin` | `member` | `viewer`)
+- `created_at`
+
+This table defines **tenant boundaries**.
+
+---
+
+### 6.4 Projects
+
+Represents consulting work.
+
+**Fields**
+- `id`
+- `organization_id`
+- `title`
+- `status` (`planned` | `in_progress` | `blocked` | `completed`)
+- `progress_percentage`
+- `created_at`
+- `updated_at`
+
+---
+
+### 6.5 Project Assignments
+
+Maps providers to projects.
+
+**Fields**
+- `id`
+- `project_id`
+- `user_id` (provider)
+- `role` (`lead` | `contributor`)
+- `created_at`
+
+---
+
+### 6.6 Messages / Conversations
+
+Contextual communication tied to projects.
+
+**Fields**
+- `id`
+- `project_id`
+- `author_user_id`
+- `message_body`
+- `is_internal` (boolean)
+- `created_at`
+
+Internal messages are never visible to customers.
+
+---
+
+### 6.7 Assets (Metadata)
+
+Files stored in Supabase Storage.
+
+**Fields**
+- `id`
+- `project_id`
+- `uploaded_by_user_id`
+- `file_name`
+- `file_type`
+- `storage_path`
+- `is_final`
+- `created_at`
+
+---
+
+### 6.8 Invoices
+
+Read-only in the portal.
+
+**Fields**
+- `id`
+- `organization_id`
+- `invoice_number`
+- `amount`
+- `currency`
+- `status` (`paid` | `due`)
+- `issued_at`
+- `due_at`
+- `pdf_url`
+
+---
+
+## 7. Backend API Requirements
+
+### Characteristics
+- Server-side only
+- Uses Supabase client
+- Protected by Row-Level Security (RLS)
+
+### Required Capabilities
+- Fetch authenticated user + memberships
+- Fetch organizations user belongs to
+- Fetch projects scoped by organization
+- Fetch messages (respecting `is_internal`)
+- Upload and list assets
+- Fetch invoices
+- Invite users to organizations
+
+---
+
+## 8. Row-Level Security (RLS) — Mandatory
+
+### Core Rules
+- Customers: access only their organization
+- Providers: access assigned organizations/projects
+- Admins: access everything
+
+**Acceptance criteria**
+- No cross-org data leakage
+- Direct table access is safe
+- All tables have RLS enabled before production
+
+---
+
+## 9. Explicit Non-Goals (v1)
+
+- No anonymous access
+- No public provider signup
+- No automatic domain verification
+- No automatic org merging
+- No cross-organization collaboration
+
+---
+
+## 10. Key Acceptance Criteria (Summary)
+
+- Users can self-signup and log in
+- Organizations are created and isolated correctly
+- Customers can invite colleagues safely
+- Providers can work across multiple customers
+- Admins have full oversight
+- No feature depends on hardcoded data
+
+---
+
+## 11. Definition of Done
+
+When this PRD is complete:
+- The portal supports real customers and consultants
+- All data is multi-tenant and secure
+- Future PRDs can assume authenticated, organization-scoped reality
+- The product is no longer a mockup, but a real platform

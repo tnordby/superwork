@@ -1,0 +1,104 @@
+# PRD: Shared Asset Library (Client & Consultant Access)
+
+## Product
+Superwork – Client Portal
+
+## Feature Name
+Shared Asset Library
+
+## Status
+Proposed
+
+## Owner
+Superwork Product
+
+## Last Updated
+2026-02-06
+
+---
+
+## 1. Problem Statement
+
+Clients and consultants currently lack a single, structured place to store and access shared assets such as:
+- Brand images and logos
+- PDFs (brand guidelines, pitch decks, brochures)
+- Fonts (for design and ad work)
+
+Assets are today shared ad hoc via email, Google Drive, Slack, or WeTransfer, which leads to:
+- Version confusion
+- Missing or outdated files
+- Time wasted asking for access
+- Assets being lost between projects
+
+This creates friction in delivery and slows down execution.
+
+---
+
+## 2. Goal
+
+Create a **Shared Asset Library** where:
+- Clients can upload and manage their assets
+- Consultants can access and use the same assets
+- All files are stored centrally in **Supabase Storage**
+- Access is scoped per client / workspace
+- Assets persist across projects and tasks
+
+---
+
+## 3. Non-Goals
+
+This feature will **not**:
+- Replace full DAM systems (e.g. Bynder, Brandfolder)
+- Include advanced image editing
+- Include real-time collaboration or commenting on files
+- Automatically sync with external drives (Google Drive, Dropbox)
+- Perform AI-based tagging or analysis (for now)
+
+---
+
+## 4. User Roles
+
+### Client User
+- Upload assets
+- View and download assets
+- Delete assets they uploaded (subject to permissions)
+- Organize assets using folders or categories
+
+### Consultant User
+- View and download all client assets
+- Upload assets on behalf of client (e.g. generated creatives)
+- Cannot delete client-uploaded assets unless explicitly allowed
+
+### Admin (Internal)
+- Full access across all clients
+- Can manage permissions and override deletions
+
+---
+
+## 5. User Stories
+
+### Client
+- As a client, I want to upload my brand assets once so I don’t have to resend them repeatedly.
+- As a client, I want to know consultants are using the correct, latest files.
+- As a client, I want to organize assets so they’re easy to find later.
+
+### Consultant
+- As a consultant, I want quick access to approved client assets so I can work efficiently.
+- As a consultant, I want to upload deliverables and assets back into the same system.
+
+---
+
+## 6. Functional Requirements
+
+### 6.1 Asset Upload
+- Supported file types:
+  - Images: `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`
+  - Documents: `.pdf`
+  - Fonts: `.ttf`, `.otf`, `.woff`, `.woff2`
+- Max file size: configurable (default 50 MB)
+- Multiple file upload supported
+- Drag-and-drop and file picker
+
+### 6.2 Storage
+- Files stored in **Supabase Storage**
+- Bucket structure scoped by:

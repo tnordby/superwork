@@ -1,0 +1,113 @@
+---
+description: Coding standards for Superwork
+alwaysApply: true
+---
+
+You are writing production code for Superwork.
+
+## General coding principles
+
+- Use TypeScript.
+- Prefer clarity over terseness.
+- Prefer explicit code over clever code.
+- Keep functions focused and reasonably small.
+- Write code that is easy to review, debug, and extend.
+- Make naming descriptive and domain-accurate.
+- Avoid unnecessary comments; comment intent, not obvious syntax.
+- Prefer consistency with existing code over personal style preferences.
+
+## Naming standards
+
+- Use names that reflect business meaning.
+- Prefer full names over abbreviations unless the abbreviation is standard and obvious.
+- Avoid vague names like `data`, `item`, `stuff`, `helper`, `misc`, or `temp`.
+- Name variables, functions, and components according to what they actually do.
+- Distinguish clearly between customer-facing and internal concepts.
+
+Examples:
+- `organizationMembership` instead of `membershipData`
+- `customerVisibleMessages` instead of `messagesList`
+- `createProjectAssetRecord` instead of `handleAsset`
+
+## Function and module standards
+
+- Functions should do one clear thing.
+- Avoid very long functions unless there is a strong reason.
+- Extract repeated logic when it meaningfully improves clarity.
+- Do not extract tiny wrappers that make code harder to follow.
+- Keep modules cohesive around one domain or responsibility.
+- Prefer explicit inputs and outputs.
+
+## React and Next.js standards
+
+- Prefer Server Components by default.
+- Use Client Components only for interactivity, browser APIs, or local UI state.
+- Keep components focused and readable.
+- Separate fetching, transformation, and rendering concerns when possible.
+- Avoid large monolithic page files.
+- Use composition over deeply nested conditionals where possible.
+
+## Form and UI state standards
+
+- Validate all user inputs.
+- Handle loading, empty, success, and error states explicitly.
+- Show useful validation and error messages.
+- Do not leave silent failures.
+- Keep forms predictable and easy to understand.
+- Prefer explicit submit flows over hidden magic.
+
+## Database and backend standards
+
+- Never bypass authorization assumptions.
+- Respect row-level security design.
+- Always scope queries correctly.
+- Be explicit about tenant ownership and access checks.
+- Prefer typed database access where possible.
+- Return clear shapes rather than loosely structured data.
+
+## API and server action standards
+
+- Validate all external inputs.
+- Fail safely and clearly.
+- Return predictable results.
+- Avoid exposing internal implementation details to the client.
+- Log important failures in a way that supports debugging.
+
+## File and project structure standards
+
+- Organize by domain where practical.
+- Keep shared utilities limited to real shared concerns.
+- Avoid creating generic utility files full of unrelated functions.
+- Prefer local clarity over abstract “clean architecture” ceremony.
+- Keep the directory structure understandable to a new contributor.
+
+## UI implementation standards
+
+- Use the design system consistently.
+- Keep spacing, hierarchy, and status indicators predictable.
+- Use customer-friendly language in customer-facing views.
+- Never expose internal-only labels, notes, or status language in customer-facing UI.
+
+## Testing and resilience standards
+
+- Write code that is testable.
+- Consider edge cases during implementation, not only afterward.
+- Do not solve only the happy path.
+- Think through authorization, missing data, empty states, and partial failures.
+
+## Avoid these coding mistakes
+
+- Do not add dependencies for trivial problems.
+- Do not over-abstract early.
+- Do not mix data access and rendering without reason.
+- Do not trust client-side role checks.
+- Do not leave TODO-driven gaps in critical auth or tenant logic.
+- Do not write code that only works with mocked demo data.
+
+## Preferred output style
+
+When generating code:
+- explain important choices briefly
+- keep implementation tight
+- match existing patterns
+- optimize for correctness and maintainability
