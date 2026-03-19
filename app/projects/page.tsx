@@ -21,7 +21,7 @@ async function loadBrowseServiceTemplates(): Promise<ProjectsBrowseServiceRow[]>
       return [];
     }
 
-    return (data ?? []).map((row) => ({
+    const rows = (data ?? []).map((row) => ({
       id: row.id,
       name: row.name,
       category: row.category,
@@ -29,6 +29,20 @@ async function loadBrowseServiceTemplates(): Promise<ProjectsBrowseServiceRow[]>
       estimated_hours: row.estimated_hours,
       is_active: row.is_active,
     }));
+
+    // Some migrations seed the same (category, name) templates more than once.
+    // Dedupe here to keep the Browse UI clean without risking DB-level deletions
+    // that could impact foreign keys (projects.service_template_id, service_sops, etc).
+    const deduped: ProjectsBrowseServiceRow[] = [];
+    const seen = new Set<string>();
+    for (const row of rows) {
+      const key = `${row.category}::${row.name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(row);
+    }
+
+    return deduped;
   } catch (e) {
     console.error('[projects] Unexpected error loading service templates:', e);
     return [];
