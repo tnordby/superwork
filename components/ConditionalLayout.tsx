@@ -12,10 +12,15 @@ export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   // Routes that should not show sidebar/header
   const authRoutes = ['/login', '/signup', '/forgot-password', '/reset-password'];
   const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
+  const isAdminRoute = pathname.startsWith('/admin');
 
   if (isAuthRoute) {
     // Auth pages - no sidebar, no header, just the content
     return <>{children}</>;
+  }
+
+  if (isAdminRoute) {
+    return <SidebarProvider>{children}</SidebarProvider>;
   }
 
   // Regular pages - show sidebar and header

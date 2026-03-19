@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuthenticatedUser } from '@/lib/auth/api';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { hasFullMessagingAccess, isConsultant } from '@/lib/auth/platform-role';
 import type { ConversationSummary } from '@/types/messaging';
 
 function getInitialsFromName(name: string): string {
@@ -46,9 +48,9 @@ export async function GET(request: NextRequest) {
   const projectId = url.searchParams.get('projectId');
   const consultantName = url.searchParams.get('consultantName');
 
-  const userRole = user.user_metadata?.role;
-  const isConsultant = userRole === 'consultant';
-  const isAdminOrPm = userRole === 'admin' || userRole === 'pm';
+  const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+  const isMessagingConsultant = isConsultant(platformRole);
+  const isAdminOrPm = hasFullMessagingAccess(platformRole);
 
   const select = `
     id,
@@ -69,7 +71,7 @@ export async function GET(request: NextRequest) {
     if (consultantName) query = query.eq('consultant_name', consultantName);
 
     if (!isAdminOrPm) {
-      if (isConsultant) {
+      if (isMessagingConsultant) {
         // Limit to projects assigned to this consultant
         const { data: assignments, error: assignmentError } = await supabase
           .from('project_assignments')
@@ -151,9 +153,9 @@ export async function POST(request: NextRequest) {
     )
   );
 
-  const userRole = user.user_metadata?.role;
-  const isConsultant = userRole === 'consultant';
-  const isAdminOrPm = userRole === 'admin' || userRole === 'pm';
+  const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+  const isMessagingConsultant = isConsultant(platformRole);
+  const isAdminOrPm = hasFullMessagingAccess(platformRole);
 
   try {
     // Derive the customer (conversation.user_id) from the project
@@ -172,7 +174,7 @@ export async function POST(request: NextRequest) {
 
     // Access check: customer owns the project, consultant is assigned, or admin/pm
     if (!isAdminOrPm) {
-      if (!isConsultant) {
+      if (!isMessagingConsultant) {
         if (customerUserId !== user.id) {
           return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }

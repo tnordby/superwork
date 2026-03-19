@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isQuoteManager } from '@/lib/auth/platform-role';
 
 // GET - List quotes (filtered by role)
 export async function GET(request: NextRequest) {
@@ -16,15 +18,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userRole = user.user_metadata?.role;
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
 
-    // If admin or PM, get all quotes; otherwise get user's quotes
     let query = supabase
       .from('quotes')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (userRole !== 'admin' && userRole !== 'pm') {
+    if (!isQuoteManager(platformRole)) {
       query = query.eq('user_id', user.id);
     }
 

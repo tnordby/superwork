@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isServicesAdmin } from '@/lib/auth/platform-role';
 
 // GET - List all active service templates
 export async function GET(request: NextRequest) {
@@ -41,9 +43,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
-    const userRole = user.user_metadata?.role;
-    if (userRole !== 'admin') {
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    if (!isServicesAdmin(platformRole)) {
       return NextResponse.json({ error: 'Only admins can create service templates' }, { status: 403 });
     }
 

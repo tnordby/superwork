@@ -6,10 +6,19 @@ import { useRouter } from 'next/navigation';
 import { Bell, User, Settings, LogOut } from 'lucide-react';
 import { useSidebar } from './SidebarContext';
 import { useAuth } from './AuthProvider';
+import type { PlatformRole } from '@/lib/auth/platform-role';
+
+function roleLabel(role: PlatformRole | null): string | null {
+  if (!role || role === 'customer') return null;
+  if (role === 'project_manager') return 'Project manager';
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
 
 export function Header() {
   const { isCollapsed } = useSidebar();
-  const { user, signOut } = useAuth();
+  const { user, signOut, platformRole } = useAuth();
+  const showCustomerShortcuts = !platformRole || platformRole === 'customer';
+  const menuRoleLabel = roleLabel(platformRole);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -56,21 +65,22 @@ export function Header() {
   return (
     <header className={`fixed top-0 right-0 z-30 h-16 border-b border-gray-200 bg-white transition-all duration-300 ${isCollapsed ? 'left-20' : 'left-64'}`}>
       <div className="flex h-full items-center justify-end gap-4 px-8">
-        {/* Submit custom brief button */}
-        <Link
-          href="/custom-brief"
-          className="rounded-full border-2 border-gray-900 bg-transparent px-6 py-2.5 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-900 hover:text-white"
-        >
-          Submit custom brief
-        </Link>
-
-        {/* Create new project button */}
-        <Link
-          href="/projects"
-          className="rounded-full bg-[#bfe937] px-6 py-2.5 text-sm font-medium text-[#0e141d] transition-opacity hover:opacity-90"
-        >
-          Create new project
-        </Link>
+        {showCustomerShortcuts && (
+          <>
+            <Link
+              href="/custom-brief"
+              className="rounded-full border-2 border-gray-900 bg-transparent px-6 py-2.5 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-900 hover:text-white"
+            >
+              Submit custom brief
+            </Link>
+            <Link
+              href="/projects"
+              className="rounded-full bg-[#bfe937] px-6 py-2.5 text-sm font-medium text-[#0e141d] transition-opacity hover:opacity-90"
+            >
+              Create new project
+            </Link>
+          </>
+        )}
 
         {/* Notification bell */}
         <button className="flex h-10 w-10 items-center justify-center rounded-full text-gray-700 transition-colors hover:bg-gray-100">
@@ -93,6 +103,9 @@ export function Header() {
               <div className="border-b border-gray-100 p-4">
                 <p className="text-sm font-semibold text-gray-900">{getUserName()}</p>
                 <p className="text-xs text-gray-600">{user?.email}</p>
+                {menuRoleLabel && (
+                  <p className="mt-1 text-xs font-medium text-gray-500">{menuRoleLabel}</p>
+                )}
               </div>
 
               {/* Menu items */}

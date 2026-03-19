@@ -30,11 +30,14 @@ export default function AdminPage() {
         </div>
       </Link>
 
-      <div className="block p-6 bg-white rounded-lg shadow-sm border border-gray-200 opacity-50 cursor-not-allowed">
+      <Link
+        href="/admin/users"
+        className="block p-6 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-amber-400 hover:shadow-md transition-all"
+      >
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-gray-100 rounded-lg">
+          <div className="p-3 bg-amber-100 rounded-lg">
             <svg
-              className="w-6 h-6 text-gray-600"
+              className="w-6 h-6 text-amber-800"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -48,11 +51,11 @@ export default function AdminPage() {
             </svg>
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Users</h2>
-            <p className="text-sm text-gray-600">Coming soon</p>
+            <h2 className="text-lg font-semibold text-gray-900">Users & roles</h2>
+            <p className="text-sm text-gray-600">Assign customer, consultant, PM, or admin</p>
           </div>
         </div>
-      </div>
+      </Link>
 
       <div className="block p-6 bg-white rounded-lg shadow-sm border border-gray-200 opacity-50 cursor-not-allowed">
         <div className="flex items-center gap-4">

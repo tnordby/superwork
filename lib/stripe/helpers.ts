@@ -58,6 +58,29 @@ export async function getCustomerSubscription(customerId: string) {
 }
 
 /**
+ * Sum of amount actually paid across all paid invoices for a subscription.
+ * Use this for prepaid “total balance” when each successful invoice adds to the pool;
+ * subscription item unit_amount alone only reflects a single period’s price.
+ */
+export async function getTotalAmountPaidForSubscription(
+  subscriptionId: string
+): Promise<{ totalCents: number; currency: string }> {
+  let totalCents = 0;
+  let currency = 'usd';
+
+  for await (const invoice of stripe.invoices.list({
+    subscription: subscriptionId,
+    status: 'paid',
+    limit: 100,
+  })) {
+    totalCents += invoice.amount_paid;
+    currency = invoice.currency;
+  }
+
+  return { totalCents, currency };
+}
+
+/**
  * Get invoice history for a customer
  */
 export async function getCustomerInvoices(customerId: string, limit = 10) {

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuthenticatedUser } from '@/lib/auth/api';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { hasFullMessagingAccess, isConsultant } from '@/lib/auth/platform-role';
 
 function getInitialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -15,9 +17,9 @@ export async function GET() {
   const { user, errorResponse } = await requireAuthenticatedUser(supabase);
   if (errorResponse) return errorResponse;
 
-  const userRole = user.user_metadata?.role;
-  const isConsultant = userRole === 'consultant';
-  const isAdminOrPm = userRole === 'admin' || userRole === 'pm';
+  const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+  const isMessagingConsultant = isConsultant(platformRole);
+  const isAdminOrPm = hasFullMessagingAccess(platformRole);
 
   try {
     // For now, customer/consultant message threads are project-scoped.
@@ -31,7 +33,7 @@ export async function GET() {
       .order('updated_at', { ascending: false });
 
     if (!isAdminOrPm) {
-      if (isConsultant) {
+      if (isMessagingConsultant) {
         const { data: assignments, error: assignmentError } = await supabase
           .from('project_assignments')
           .select('project_id')

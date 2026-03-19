@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import {
+  getWorkspaceBudgetSnapshot,
+  quotePriceToCents,
+} from '@/lib/billing/workspace-budget';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isQuoteManager } from '@/lib/auth/platform-role';
 
 // GET - Get single quote with line items
 export async function GET(
@@ -31,9 +37,8 @@ export async function GET(
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
     }
 
-    // Check permissions
-    const userRole = user.user_metadata?.role;
-    if (userRole !== 'admin' && userRole !== 'pm' && quote.user_id !== user.id) {
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    if (!isQuoteManager(platformRole) && quote.user_id !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -91,13 +96,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
     }
 
-    const userRole = user.user_metadata?.role;
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
 
     // Build update object based on permissions and status
     const updateData: any = {};
 
     // Only PM/admin can update PM-specific fields
-    if (userRole === 'admin' || userRole === 'pm') {
+    if (isQuoteManager(platformRole)) {
       if (body.final_price !== undefined) updateData.final_price = body.final_price;
       if (body.pm_notes !== undefined) updateData.pm_notes = body.pm_notes;
       if (body.assigned_lead_user_id !== undefined)
@@ -114,6 +119,37 @@ export async function PATCH(
     // Customer can approve or reject
     if (existingQuote.user_id === user.id) {
       if (body.status === 'approved' && existingQuote.status === 'pending_customer_approval') {
+        const { data: customerWorkspace, error: wsLookupError } = await supabase
+          .from('workspaces')
+          .select('id')
+          .eq('owner_id', existingQuote.user_id)
+          .maybeSingle();
+
+        if (wsLookupError || !customerWorkspace) {
+          return NextResponse.json(
+            { error: 'Your workspace must be set up before you can approve quotes.' },
+            { status: 400 }
+          );
+        }
+
+        const quoteCents = quotePriceToCents(
+          existingQuote.final_price,
+          existingQuote.estimated_price
+        );
+
+        if (quoteCents > 0) {
+          const budget = await getWorkspaceBudgetSnapshot(supabase, customerWorkspace.id);
+          if (budget.availableCents < quoteCents) {
+            return NextResponse.json(
+              {
+                error:
+                  'Insufficient balance to accept this quote. Available budget is less than the quoted amount.',
+              },
+              { status: 400 }
+            );
+          }
+        }
+
         updateData.status = 'approved';
         updateData.approved_at = new Date().toISOString();
         updateData.approved_by_user_id = user.id;
@@ -144,19 +180,54 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // If approved, create project
+    // If approved, create project (workspace + committed cost)
     if (updateData.status === 'approved') {
-      try {
-        const { data: projectId, error: projectError } = await supabase.rpc(
-          'create_project_from_quote',
-          { quote_id_param: id }
-        );
+      const { data: projectId, error: projectError } = await supabase.rpc(
+        'create_project_from_quote',
+        { quote_id_param: id }
+      );
 
-        if (projectError) {
-          console.error('Error creating project from quote:', projectError);
+      if (projectError) {
+        console.error('Error creating project from quote:', projectError);
+        const { error: revertError } = await supabase
+          .from('quotes')
+          .update({
+            status: 'pending_customer_approval',
+            approved_at: null,
+            approved_by_user_id: null,
+            assignment_locked: false,
+          })
+          .eq('id', id);
+
+        if (revertError) {
+          console.error('Failed to revert quote after project creation error:', revertError);
         }
-      } catch (err) {
-        console.error('Error calling create_project_from_quote:', err);
+
+        return NextResponse.json(
+          {
+            error:
+              projectError.message ||
+              'Could not create the project from this quote. Your approval was rolled back — try again or contact support.',
+          },
+          { status: 500 }
+        );
+      }
+
+      if (!projectId) {
+        await supabase
+          .from('quotes')
+          .update({
+            status: 'pending_customer_approval',
+            approved_at: null,
+            approved_by_user_id: null,
+            assignment_locked: false,
+          })
+          .eq('id', id);
+
+        return NextResponse.json(
+          { error: 'Project was not created. Your approval was rolled back.' },
+          { status: 500 }
+        );
       }
     }
 
@@ -207,9 +278,8 @@ export async function DELETE(
       );
     }
 
-    // Check permissions
-    const userRole = user.user_metadata?.role;
-    if (userRole !== 'admin' && userRole !== 'pm' && quote.user_id !== user.id) {
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    if (!isQuoteManager(platformRole) && quote.user_id !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

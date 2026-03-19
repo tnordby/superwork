@@ -69,9 +69,26 @@ export async function PATCH(request: NextRequest) {
 
     if (existingError) throw existingError;
 
-    const nextRecord = {
+    const merged = {
       ...normalizeProgress(existing, user.id),
       ...patch,
+    };
+
+    const allComplete =
+      merged.hubspot_access_completed &&
+      merged.document_completed &&
+      merged.survey_completed;
+
+    if (patch.is_hidden === true && !allComplete) {
+      return NextResponse.json(
+        { error: 'Complete all onboarding steps before hiding this section.' },
+        { status: 400 }
+      );
+    }
+
+    const nextRecord = {
+      ...merged,
+      ...(!allComplete ? { is_hidden: false as const } : {}),
     };
 
     const { data: updated, error: upsertError } = await supabase

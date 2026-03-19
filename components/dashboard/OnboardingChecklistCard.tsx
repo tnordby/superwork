@@ -1,5 +1,6 @@
 'use client';
 
+import { Play } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type OnboardingProgress = {
@@ -23,9 +24,9 @@ type ChecklistItem = {
   id: 'hubspot' | 'document' | 'survey';
   title: string;
   description: string;
+  linkLabel: string;
   href: string;
   completed: boolean;
-  highlighted?: boolean;
 };
 
 export default function OnboardingChecklistCard({ initialProgress, links }: OnboardingChecklistCardProps) {
@@ -38,22 +39,24 @@ export default function OnboardingChecklistCard({ initialProgress, links }: Onbo
       {
         id: 'hubspot',
         title: 'Give HubSpot access',
-        description: 'Use your company access link so our team can securely access your HubSpot portal.',
+        description: 'Share access so we can work in your portal securely.',
+        linkLabel: 'Grant access',
         href: links.hubspotAccessUrl,
         completed: progress.hubspotAccessCompleted,
-        highlighted: true,
       },
       {
         id: 'document',
-        title: 'Complete onboarding document',
-        description: 'Provide your business context and goals.',
+        title: 'Onboarding document',
+        description: 'Business context and goals.',
+        linkLabel: 'Open document',
         href: links.documentUrl,
         completed: progress.documentCompleted,
       },
       {
         id: 'survey',
-        title: 'Complete onboarding survey',
-        description: 'Answer setup questions for your engagement.',
+        title: 'Onboarding survey',
+        description: 'A few setup questions for your engagement.',
+        linkLabel: 'Take survey',
         href: links.surveyUrl,
         completed: progress.surveyCompleted,
       },
@@ -61,25 +64,20 @@ export default function OnboardingChecklistCard({ initialProgress, links }: Onbo
     [progress, links]
   );
 
-  const completedCount = items.filter((item) => item.completed).length;
-  const totalItems = items.length;
-  const isComplete = completedCount === totalItems;
+  const allChecklistComplete = items.every((item) => item.completed);
 
   if (progress.isHidden) {
     return (
-      <section className="rounded-2xl border border-[#d7e7f7] bg-[#f7fbff] p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Onboarding hidden</h2>
-            <p className="mt-1 text-sm text-gray-600">You can show it again anytime.</p>
-          </div>
+      <section className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm text-gray-700">Onboarding hidden.</p>
           <button
             type="button"
             onClick={() => void updateProgressPatch('isHidden', false)}
             disabled={savingField === 'isHidden'}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
           >
-            {savingField === 'isHidden' ? 'Saving...' : 'Show onboarding'}
+            {savingField === 'isHidden' ? 'Saving...' : 'Show again'}
           </button>
         </div>
       </section>
@@ -141,101 +139,101 @@ export default function OnboardingChecklistCard({ initialProgress, links }: Onbo
   }
 
   return (
-    <section className="rounded-2xl border border-[#d7e7f7] bg-[#f7fbff] p-6">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Onboarding</h2>
-          <p className="mt-1 text-sm text-gray-600 max-w-2xl">
-            Complete these setup steps once. Hide this section once it is no longer needed.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void updateProgressPatch('isHidden', true)}
-          disabled={savingField === 'isHidden'}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-lg leading-none text-gray-500 transition-colors hover:text-gray-800 hover:bg-gray-50 disabled:opacity-60"
-          aria-label="Hide onboarding"
-          title="Hide onboarding"
-        >
-          ×
-        </button>
+    <section className="rounded-2xl border-2 border-[#c5dc6a] bg-gradient-to-br from-[#f7fcea] via-[#f1f8e4] to-[#eaf4d4] p-6 shadow-sm">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <h2 className="text-xl font-semibold text-gray-900">Onboarding</h2>
+        {allChecklistComplete ? (
+          <button
+            type="button"
+            onClick={() => void updateProgressPatch('isHidden', true)}
+            disabled={savingField === 'isHidden'}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-gray-900/90 bg-white text-xl font-light leading-none text-gray-900 shadow-md transition-colors hover:bg-gray-50 hover:border-gray-900 disabled:opacity-60"
+            aria-label="Hide onboarding section"
+            title="Hide after completing all steps"
+          >
+            ×
+          </button>
+        ) : null}
       </div>
 
       {error && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="rounded-xl border border-[#dfe7ef] bg-white p-4 lg:col-span-6">
-          <p className="text-sm font-semibold text-gray-900">Onboarding walkthrough</p>
-          <p className="mt-1 text-sm text-gray-600">A quick setup video can live here for new customers.</p>
-          <div className="mt-3 flex h-44 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500">
-            Video placeholder
-          </div>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-stretch lg:gap-10">
+        <div className="flex flex-col lg:h-full lg:min-h-0 lg:pr-2">
           <a
             href={links.videoUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 inline-block text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900"
+            aria-label="Open onboarding overview video"
+            className="flex min-h-[11rem] flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-[#d6e8b0] bg-white/80 px-4 py-10 text-gray-500 shadow-sm backdrop-blur-[2px] transition-colors hover:border-[#bfe937]/60 hover:bg-white lg:min-h-0 lg:py-6"
           >
-            Open onboarding video →
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-gray-800 shadow-sm ring-1 ring-gray-200/80">
+              <Play className="ml-0.5 h-6 w-6" fill="currentColor" aria-hidden />
+            </span>
           </a>
         </div>
 
-        <div className="rounded-xl border border-[#dfe7ef] bg-white p-4 lg:col-span-6">
-          <p className="text-sm font-semibold text-gray-900">Onboarding checklist</p>
-          <div className="mt-4 space-y-3">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className={`rounded-lg border p-3 ${
-                  item.highlighted
-                    ? 'border-[#cde98f] bg-[#f6ffd8]'
-                    : 'border-gray-200 bg-gray-50'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                    <p className="mt-1 text-sm text-gray-600">{item.description}</p>
-                    <a
-                      href={item.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 inline-block text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900"
-                    >
-                      {item.id === 'hubspot' ? 'Open HubSpot access link →' : 'Open placeholder →'}
-                    </a>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void updateItemCompletion(item.id, !item.completed)}
-                    disabled={savingField === item.id}
-                    className={`mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md border transition-colors disabled:opacity-60 ${
-                      item.completed
-                        ? 'border-green-500 bg-green-500 text-white'
-                        : 'border-gray-300 bg-white text-transparent hover:border-gray-400'
-                    }`}
-                    aria-label={item.completed ? `Mark ${item.title} incomplete` : `Mark ${item.title} complete`}
+        <div className="flex flex-col border-t border-[#dce9c4] pt-6 lg:border-t-0 lg:border-l lg:pl-8 lg:pt-0">
+          <p className="text-sm font-medium text-gray-900">Checklist</p>
+          <ol className="mt-3 list-none divide-y divide-[#dce9c4] p-0">
+            {items.map((item, index) => (
+              <li key={item.id} value={index + 1} className="flex items-start gap-3 py-4 first:pt-0 sm:gap-4">
+                <span
+                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ring-1 ${
+                    item.completed
+                      ? 'bg-white/60 text-gray-500 ring-[#dce9c4]'
+                      : 'bg-white/90 text-gray-900 ring-[#c5dc6a]'
+                  }`}
+                >
+                  {index + 1}
+                </span>
+                <div
+                  className={`min-w-0 flex-1 ${item.completed ? 'text-gray-500' : ''}`}
+                >
+                  <p
+                    className={`text-sm font-medium ${item.completed ? 'line-through' : 'text-gray-900'}`}
                   >
-                    {savingField === item.id
-                      ? '…'
-                      : item.completed
-                        ? '✓'
-                        : '✓'}
-                  </button>
+                    {item.title}
+                  </p>
+                  <p
+                    className={`mt-0.5 text-sm ${item.completed ? 'line-through' : 'text-gray-600'}`}
+                  >
+                    {item.description}
+                  </p>
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`mt-2 inline-flex text-sm font-medium ${
+                      item.completed
+                        ? 'line-through no-underline'
+                        : 'text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-500'
+                    }`}
+                  >
+                    {item.linkLabel}
+                  </a>
                 </div>
-              </div>
+                <button
+                  type="button"
+                  onClick={() => void updateItemCompletion(item.id, !item.completed)}
+                  disabled={savingField === item.id}
+                  className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium transition-colors disabled:opacity-60 ${
+                    item.completed
+                      ? 'border-[#bfe937] bg-[#bfe937] text-gray-900'
+                      : 'border-gray-300 bg-white text-transparent hover:border-[#bfe937]'
+                  }`}
+                  aria-label={item.completed ? `Mark ${item.title} incomplete` : `Mark ${item.title} complete`}
+                >
+                  {savingField === item.id ? '…' : item.completed ? '✓' : ''}
+                </button>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
-      </div>
-      <div className="mt-4 border-t border-[#dfe7ef] pt-3">
-        <p className="text-xs text-gray-500">
-          {isComplete ? 'All onboarding items are complete.' : 'Complete the checklist, or hide it with the X button.'}
-        </p>
       </div>
     </section>
   );

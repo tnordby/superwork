@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isInternalStaff, isServicesAdmin } from '@/lib/auth/platform-role';
 
 // GET - List tasks for an SOP
 export async function GET(
@@ -20,9 +22,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only admins/PMs/consultants can view SOP tasks
-    const userRole = user.user_metadata?.role;
-    if (userRole !== 'admin' && userRole !== 'pm' && userRole !== 'consultant') {
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    if (!isInternalStaff(platformRole)) {
       return NextResponse.json({ error: 'Not authorized to view SOP tasks' }, { status: 403 });
     }
 
@@ -63,9 +64,8 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only admins can create SOP tasks
-    const userRole = user.user_metadata?.role;
-    if (userRole !== 'admin') {
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    if (!isServicesAdmin(platformRole)) {
       return NextResponse.json({ error: 'Only admins can create SOP tasks' }, { status: 403 });
     }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreditCard, Calendar, Check, Zap } from 'lucide-react';
+import { sumCommittedBalanceCents, sumUsedBalanceCents } from '@/lib/billing/project-balances';
 import { formatAmount, formatBillingInterval, formatSubscriptionStatus } from '@/lib/stripe/utils';
 import { createClient } from '@/lib/supabase/client';
 import { SubscriptionBanner } from '@/components/billing/SubscriptionBanner';
@@ -36,14 +37,14 @@ interface SubscriptionData {
 
 interface ProjectCosts {
   usedBalance: number;
-  inProgressBalance: number;
+  committedBalance: number;
 }
 
 export default function PlanPage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
-  const [projectCosts, setProjectCosts] = useState<ProjectCosts>({ usedBalance: 0, inProgressBalance: 0 });
+  const [projectCosts, setProjectCosts] = useState<ProjectCosts>({ usedBalance: 0, committedBalance: 0 });
   const [loading, setLoading] = useState(true);
   const [managingBilling, setManagingBilling] = useState(false);
   const [subscribingToPlan, setSubscribingToPlan] = useState<string | null>(null);
@@ -82,22 +83,15 @@ export default function PlanPage() {
           }
         }
 
-        // Fetch projects to calculate used and in-progress balances
         const { data: projectsData, error: projectsError } = await supabase
           .from('projects')
           .select('cost, status')
           .eq('workspace_id', workspaceData.id);
 
         if (!projectsError && projectsData) {
-          const usedBalance = projectsData
-            .filter(p => p.status === 'completed')
-            .reduce((sum, p) => sum + (p.cost || 0), 0);
-
-          const inProgressBalance = projectsData
-            .filter(p => p.status === 'in_progress')
-            .reduce((sum, p) => sum + (p.cost || 0), 0);
-
-          setProjectCosts({ usedBalance, inProgressBalance });
+          const usedBalance = sumUsedBalanceCents(projectsData);
+          const committedBalance = sumCommittedBalanceCents(projectsData);
+          setProjectCosts({ usedBalance, committedBalance });
         }
       } else {
         // Create a workspace for the user
@@ -312,7 +306,7 @@ export default function PlanPage() {
   // Calculate balances
   const startingBalance = subscriptionData?.amount || 0;
   const currency = subscriptionData?.currency || 'eur';
-  const availableBalance = startingBalance - projectCosts.usedBalance - projectCosts.inProgressBalance;
+  const availableBalance = startingBalance - projectCosts.usedBalance - projectCosts.committedBalance;
 
   return (
     <div className="p-8">
@@ -411,8 +405,8 @@ export default function PlanPage() {
               </div>
 
               <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                <span className="text-sm text-gray-600">In progress</span>
-                <span className="text-sm font-medium text-orange-600">-{formatAmount(projectCosts.inProgressBalance, currency)}</span>
+                <span className="text-sm text-gray-600">Committed</span>
+                <span className="text-sm font-medium text-orange-600">-{formatAmount(projectCosts.committedBalance, currency)}</span>
               </div>
 
               <div className="flex items-center justify-between py-3">
@@ -444,7 +438,7 @@ export default function PlanPage() {
               <div className="flex items-center justify-between py-3 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="h-2 w-2 rounded-full bg-blue-600"></div>
-                  <span className="text-sm text-gray-900">Starting monthly budget</span>
+                  <span className="text-sm text-gray-900">Purchased balance</span>
                 </div>
                 <span className="text-sm font-medium text-gray-900">{formatAmount(startingBalance, currency)}</span>
               </div>
@@ -462,9 +456,9 @@ export default function PlanPage() {
               <div className="flex items-center justify-between py-3 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="h-2 w-2 rounded-full bg-orange-600"></div>
-                  <span className="text-sm text-gray-900">Reserved for in-progress projects</span>
+                  <span className="text-sm text-gray-900">Committed to active projects</span>
                 </div>
-                <span className="text-sm font-medium text-orange-600">-{formatAmount(projectCosts.inProgressBalance, currency)}</span>
+                <span className="text-sm font-medium text-orange-600">-{formatAmount(projectCosts.committedBalance, currency)}</span>
               </div>
 
               {/* Available Balance */}

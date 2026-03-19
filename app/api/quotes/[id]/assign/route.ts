@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isQuoteManager } from '@/lib/auth/platform-role';
 
 // POST - Assign consultant to quote
 export async function POST(
@@ -20,9 +22,8 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only PM/admin can assign
-    const userRole = user.user_metadata?.role;
-    if (userRole !== 'admin' && userRole !== 'pm') {
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    if (!isQuoteManager(platformRole)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -94,9 +95,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only PM/admin can remove assignment
-    const userRole = user.user_metadata?.role;
-    if (userRole !== 'admin' && userRole !== 'pm') {
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    if (!isQuoteManager(platformRole)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

@@ -1,6 +1,10 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { DollarSign } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isAdmin, isConsultant, isQuoteManager } from '@/lib/auth/platform-role';
+import { sumCommittedBalanceCents, sumUsedBalanceCents } from '@/lib/billing/project-balances';
 import { formatAmount } from '@/lib/stripe/utils';
 import OnboardingChecklistCard from '@/components/dashboard/OnboardingChecklistCard';
 
@@ -40,7 +44,7 @@ type DashboardData = {
   billing: {
     totalBalance: number;
     usedBalance: number;
-    inProgressBalance: number;
+    committedBalance: number;
     availableBalance: number;
     currency: string;
     subscriptionStatus: string | null;
@@ -116,7 +120,7 @@ async function loadDashboardData(): Promise<DashboardData> {
     billing: {
       totalBalance: 0,
       usedBalance: 0,
-      inProgressBalance: 0,
+      committedBalance: 0,
       availableBalance: 0,
       currency: 'usd',
       subscriptionStatus: null,
@@ -192,13 +196,8 @@ async function loadDashboardData(): Promise<DashboardData> {
       updated_at: project.updated_at,
     }));
 
-    const usedBalance = projects
-      .filter((project) => project.status === 'completed')
-      .reduce((sum, project) => sum + (project.cost ?? 0), 0);
-
-    const inProgressBalance = projects
-      .filter((project) => project.status === 'in_progress')
-      .reduce((sum, project) => sum + (project.cost ?? 0), 0);
+    const usedBalance = sumUsedBalanceCents(projects);
+    const committedBalance = sumCommittedBalanceCents(projects);
 
     let totalBalance = 0;
     let currency = 'usd';
@@ -206,12 +205,16 @@ async function loadDashboardData(): Promise<DashboardData> {
     if (ownedWorkspace?.stripe_subscription_id && process.env.STRIPE_SECRET_KEY) {
       try {
         const { stripe } = await import('@/lib/stripe/config');
+        const { getTotalAmountPaidForSubscription } = await import('@/lib/stripe/helpers');
         const subscription = await stripe.subscriptions.retrieve(
           ownedWorkspace.stripe_subscription_id
         );
         const primaryPrice = subscription.items.data[0]?.price;
-        totalBalance = primaryPrice?.unit_amount ?? 0;
-        currency = primaryPrice?.currency ?? 'usd';
+        const paid = await getTotalAmountPaidForSubscription(ownedWorkspace.stripe_subscription_id);
+        // Cumulative paid invoices (e.g. 8k + 8k = 16k); fall back to plan unit if none paid yet
+        totalBalance =
+          paid.totalCents > 0 ? paid.totalCents : (primaryPrice?.unit_amount ?? 0);
+        currency = paid.totalCents > 0 ? paid.currency : (primaryPrice?.currency ?? 'usd');
       } catch (stripeError) {
         console.error('[dashboard] Failed to load Stripe subscription amount:', stripeError);
       }
@@ -293,8 +296,8 @@ async function loadDashboardData(): Promise<DashboardData> {
       billing: {
         totalBalance,
         usedBalance,
-        inProgressBalance,
-        availableBalance: totalBalance - usedBalance - inProgressBalance,
+        committedBalance,
+        availableBalance: totalBalance - usedBalance - committedBalance,
         currency,
         subscriptionStatus: ownedWorkspace?.stripe_subscription_status ?? null,
         subscriptionInterval: ownedWorkspace?.subscription_interval ?? null,
@@ -308,6 +311,21 @@ async function loadDashboardData(): Promise<DashboardData> {
 }
 
 export default async function Home() {
+  const supabase = await createClient();
+  const {
+    data: { user: homeUser },
+  } = await supabase.auth.getUser();
+
+  if (homeUser) {
+    const role = await resolvePlatformRole(supabase, homeUser.id, homeUser.user_metadata?.role);
+    if (isAdmin(role)) {
+      redirect('/admin');
+    }
+    if (isConsultant(role) || isQuoteManager(role)) {
+      redirect('/team');
+    }
+  }
+
   const { activeProjects, recentActivity, onboardingProgress, onboardingLinks, billing } = await loadDashboardData();
 
   return (
@@ -379,9 +397,9 @@ export default async function Home() {
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-gray-600">In progress</span>
+              <span className="text-gray-600">Committed</span>
               <span className="text-lg font-semibold text-gray-900">
-                -{formatAmount(billing.inProgressBalance, billing.currency)}
+                -{formatAmount(billing.committedBalance, billing.currency)}
               </span>
             </div>
 

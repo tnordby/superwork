@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -29,7 +29,9 @@ import {
   FolderKanban,
   Shield,
   Zap,
+  ClipboardList,
 } from 'lucide-react';
+import { normalizePlatformRole, isAdmin as isAdminRole, isQuoteManager } from '@/lib/auth/platform-role';
 
 interface NavItem {
   label: string;
@@ -43,81 +45,6 @@ interface ExpandableNavItem {
   subItems: NavItem[];
 }
 
-const navigationItems: (NavItem | ExpandableNavItem)[] = [
-  {
-    label: 'Home',
-    href: '/',
-    icon: Home,
-  },
-  {
-    label: 'Projects',
-    icon: Briefcase,
-    subItems: [
-      {
-        label: 'All services',
-        href: '/projects?tab=browse',
-        icon: Grid3x3,
-      },
-      {
-        label: 'My projects',
-        href: '/projects/active',
-        icon: FolderKanban,
-      },
-    ],
-  },
-  {
-    label: 'Inbox',
-    href: '/inbox',
-    icon: Inbox,
-  },
-  {
-    label: 'Account',
-    icon: Wallet,
-    subItems: [
-      {
-        label: 'Balance',
-        href: '/account/balance',
-        icon: CreditCard,
-      },
-      {
-        label: 'Usage',
-        href: '/account/usage',
-        icon: BarChart3,
-      },
-      {
-        label: 'Plan',
-        href: '/account/plan',
-        icon: Layers,
-      },
-      {
-        label: 'Invoices',
-        href: '/account/invoices',
-        icon: FileText,
-      },
-      {
-        label: 'Members',
-        href: '/account/members',
-        icon: Users,
-      },
-      {
-        label: 'Teams',
-        href: '/account/teams',
-        icon: FolderTree,
-      },
-      {
-        label: 'Settings',
-        href: '/account/settings',
-        icon: Settings,
-      },
-    ],
-  },
-  {
-    label: 'Assets',
-    href: '/assets',
-    icon: Folder,
-  },
-];
-
 const bottomNavigationItems: NavItem[] = [
   {
     label: 'Submit feedback',
@@ -130,101 +57,76 @@ function isExpandableNavItem(item: NavItem | ExpandableNavItem): item is Expanda
   return 'subItems' in item;
 }
 
+const projectsSection: ExpandableNavItem = {
+  label: 'Projects',
+  icon: Briefcase,
+  subItems: [
+    { label: 'All services', href: '/projects?tab=browse', icon: Grid3x3 },
+    { label: 'My projects', href: '/projects/active', icon: FolderKanban },
+  ],
+};
+
+const customerAccountSection: ExpandableNavItem = {
+  label: 'Account',
+  icon: Wallet,
+  subItems: [
+    { label: 'Balance', href: '/account/balance', icon: CreditCard },
+    { label: 'Usage', href: '/account/usage', icon: BarChart3 },
+    { label: 'Plan', href: '/account/plan', icon: Layers },
+    { label: 'Invoices', href: '/account/invoices', icon: FileText },
+    { label: 'Members', href: '/account/members', icon: Users },
+    { label: 'Teams', href: '/account/teams', icon: FolderTree },
+    { label: 'Settings', href: '/account/settings', icon: Settings },
+    { label: 'Integrations', href: '/integrations', icon: Zap },
+  ],
+};
+
+const internalWorkspaceSection: ExpandableNavItem = {
+  label: 'Workspace',
+  icon: Wallet,
+  subItems: [{ label: 'Settings', href: '/account/settings', icon: Settings }],
+};
+
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Projects', 'Account']));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Projects', 'Account', 'Workspace']));
   const { isCollapsed, setIsCollapsed } = useSidebar();
-  const { signOut, user } = useAuth();
+  const { signOut, user, platformRole } = useAuth();
 
-  // Check if user is admin
-  const isAdmin = user?.user_metadata?.role === 'admin';
+  const effectiveRole = platformRole ?? normalizePlatformRole(user?.user_metadata?.role);
+  const useInternalShell = effectiveRole !== 'customer';
 
-  // Build navigation items dynamically based on user role
-  const dynamicNavigationItems: (NavItem | ExpandableNavItem)[] = [
-    {
-      label: 'Home',
-      href: '/',
-      icon: Home,
-    },
-    ...(isAdmin ? [{
-      label: 'Admin',
-      href: '/admin',
-      icon: Shield,
-    }] : []),
-    {
-      label: 'Projects',
-      icon: Briefcase,
-      subItems: [
-        {
-          label: 'All services',
-          href: '/projects?tab=browse',
-          icon: Grid3x3,
-        },
-        {
-          label: 'My projects',
-          href: '/projects/active',
-          icon: FolderKanban,
-        },
-      ],
-    },
-    {
-      label: 'Inbox',
-      href: '/inbox',
-      icon: Inbox,
-    },
-    {
-      label: 'Account',
-      icon: Wallet,
-      subItems: [
-        {
-          label: 'Balance',
-          href: '/account/balance',
-          icon: CreditCard,
-        },
-        {
-          label: 'Usage',
-          href: '/account/usage',
-          icon: BarChart3,
-        },
-        {
-          label: 'Plan',
-          href: '/account/plan',
-          icon: Layers,
-        },
-        {
-          label: 'Invoices',
-          href: '/account/invoices',
-          icon: FileText,
-        },
-        {
-          label: 'Members',
-          href: '/account/members',
-          icon: Users,
-        },
-        {
-          label: 'Teams',
-          href: '/account/teams',
-          icon: FolderTree,
-        },
-        {
-          label: 'Settings',
-          href: '/account/settings',
-          icon: Settings,
-        },
-        {
-          label: 'Integrations',
-          href: '/integrations',
-          icon: Zap,
-        },
-      ],
-    },
-    {
-      label: 'Assets',
-      href: '/assets',
-      icon: Folder,
-    },
-  ];
+  const dynamicNavigationItems: (NavItem | ExpandableNavItem)[] = useMemo(() => {
+    if (!useInternalShell) {
+      const items: (NavItem | ExpandableNavItem)[] = [
+        { label: 'Home', href: '/', icon: Home },
+        ...(isAdminRole(effectiveRole) ? [{ label: 'Admin', href: '/admin', icon: Shield }] : []),
+        projectsSection,
+        { label: 'Inbox', href: '/inbox', icon: Inbox },
+        customerAccountSection,
+        { label: 'Assets', href: '/assets', icon: Folder },
+      ];
+      return items;
+    }
+
+    const items: (NavItem | ExpandableNavItem)[] = [
+      { label: 'Team home', href: '/team', icon: Home },
+      { label: 'Inbox', href: '/inbox', icon: Inbox },
+      projectsSection,
+    ];
+
+    if (isQuoteManager(effectiveRole)) {
+      items.push({ label: 'Quotes', href: '/team/quotes', icon: ClipboardList });
+    }
+
+    if (isAdminRole(effectiveRole)) {
+      items.push({ label: 'Admin', href: '/admin', icon: Shield });
+    }
+
+    items.push(internalWorkspaceSection, { label: 'Assets', href: '/assets', icon: Folder });
+    return items;
+  }, [useInternalShell, effectiveRole]);
 
   const toggleSection = (label: string) => {
     setExpandedSections((prev) => {
@@ -251,8 +153,10 @@ export function Sidebar() {
     router.refresh();
   };
 
+  const asideClass = useInternalShell ? 'bg-[#1a2332]' : 'bg-[#0e141d]';
+
   return (
-    <aside className={`fixed left-0 top-0 z-40 h-screen bg-[#0e141d] transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+    <aside className={`fixed left-0 top-0 z-40 h-screen ${asideClass} transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
       <div className="flex h-full flex-col">
         {/* Logo and Toggle */}
         <div className={`flex h-16 items-center ${isCollapsed ? 'justify-center' : 'justify-between px-4'}`}>
@@ -275,13 +179,21 @@ export function Sidebar() {
             </div>
           ) : (
             <>
-              <Image
-                src="/superwork-logo-white.svg"
-                alt="Superwork"
-                width={140}
-                height={28}
-                priority
-              />
+              <div className="flex min-w-0 flex-col gap-1">
+                {useInternalShell && (
+                  <span className="w-fit rounded bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#bfe937]">
+                    Team
+                  </span>
+                )}
+                <Image
+                  src="/superwork-logo-white.svg"
+                  alt="Superwork"
+                  width={140}
+                  height={28}
+                  priority
+                  className="max-w-[140px]"
+                />
+              </div>
               <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-white/5 hover:text-white"

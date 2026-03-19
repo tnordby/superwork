@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role'
+import { isServicesAdmin } from '@/lib/auth/platform-role'
 
 // PATCH /api/tasks/[id] - Update SOP task
 export async function PATCH(
@@ -15,8 +17,8 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const userRole = user.user_metadata?.role
-  if (userRole !== 'admin') {
+  const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role)
+  if (!isServicesAdmin(platformRole)) {
     return NextResponse.json(
       { error: 'Only admins can update SOP tasks' },
       { status: 403 }
@@ -61,8 +63,8 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const userRole = user.user_metadata?.role
-  if (userRole !== 'admin') {
+  const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role)
+  if (!isServicesAdmin(platformRole)) {
     return NextResponse.json(
       { error: 'Only admins can delete SOP tasks' },
       { status: 403 }

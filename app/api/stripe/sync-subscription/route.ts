@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe/config';
 import { createClient } from '@/lib/supabase/server';
+import { getTotalAmountPaidForSubscription } from '@/lib/stripe/helpers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,6 +54,11 @@ export async function POST(request: NextRequest) {
 
     const subscription = subscriptions.data[0];
     const price = subscription.items.data[0].price;
+    const paid = await getTotalAmountPaidForSubscription(subscription.id);
+    const reportedAmount =
+      paid.totalCents > 0 ? paid.totalCents : (price.unit_amount ?? 0);
+    const reportedCurrency =
+      paid.totalCents > 0 ? paid.currency : price.currency;
 
     // Determine interval
     let interval = 'monthly';
@@ -88,8 +94,9 @@ export async function POST(request: NextRequest) {
       subscription: {
         id: subscription.id,
         status: subscription.status,
-        amount: price.unit_amount,
-        currency: price.currency,
+        amount: reportedAmount,
+        currency: reportedCurrency,
+        perPeriodAmount: price.unit_amount,
         interval,
       },
     });

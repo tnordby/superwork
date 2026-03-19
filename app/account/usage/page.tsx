@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { sumCommittedBalanceCents, sumUsedBalanceCents } from '@/lib/billing/project-balances';
 import { formatAmount } from '@/lib/stripe/utils';
 import { createClient } from '@/lib/supabase/client';
 
@@ -33,7 +34,7 @@ interface Project {
 interface UsageSummary {
   startingBalance: number;
   usedBalance: number;
-  inProgressBalance: number;
+  committedBalance: number;
   availableBalance: number;
   currency: string;
 }
@@ -100,18 +101,15 @@ export default function UsagePage() {
       } else {
         setProjects(projectsData || []);
 
-        // Calculate usage
-        const completedProjects = projectsData?.filter(p => p.status === 'completed') || [];
-        const inProgressProjects = projectsData?.filter(p => p.status === 'in_progress') || [];
-
-        const usedBalance = completedProjects.reduce((sum, p) => sum + (p.cost || 0), 0);
-        const inProgressBalance = inProgressProjects.reduce((sum, p) => sum + (p.cost || 0), 0);
-        const availableBalance = subscriptionBalance - usedBalance - inProgressBalance;
+        const rows = projectsData ?? [];
+        const usedBalance = sumUsedBalanceCents(rows);
+        const committedBalance = sumCommittedBalanceCents(rows);
+        const availableBalance = subscriptionBalance - usedBalance - committedBalance;
 
         setUsage({
           startingBalance: subscriptionBalance,
           usedBalance,
-          inProgressBalance,
+          committedBalance,
           availableBalance,
           currency,
         });
@@ -152,7 +150,7 @@ export default function UsagePage() {
       {usage && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="rounded-xl border border-gray-200 bg-white p-6">
-            <h3 className="text-sm font-medium text-gray-600 mb-2">Starting Balance</h3>
+            <h3 className="text-sm font-medium text-gray-600 mb-2">Purchased balance</h3>
             <p className="text-2xl font-semibold text-gray-900">
               {formatAmount(usage.startingBalance, usage.currency)}
             </p>
@@ -166,9 +164,9 @@ export default function UsagePage() {
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-6">
-            <h3 className="text-sm font-medium text-gray-600 mb-2">In Progress</h3>
+            <h3 className="text-sm font-medium text-gray-600 mb-2">Committed</h3>
             <p className="text-2xl font-semibold text-orange-600">
-              -{formatAmount(usage.inProgressBalance, usage.currency)}
+              -{formatAmount(usage.committedBalance, usage.currency)}
             </p>
           </div>
 
@@ -228,9 +226,11 @@ export default function UsagePage() {
                     {formatAmount(project.cost || 0, usage?.currency || 'eur')}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {project.status === 'completed' ? 'Deducted' :
-                     project.status === 'in_progress' ? 'Reserved' :
-                     'Planned'}
+                    {project.status === 'completed'
+                      ? 'Deducted'
+                      : (project.cost || 0) > 0
+                        ? 'Committed'
+                        : 'Planned'}
                   </p>
                 </div>
               </div>
