@@ -7,6 +7,7 @@ import {
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isQuoteManager } from '@/lib/auth/platform-role';
 import { validateQuoteAssignee } from '@/lib/auth/quote-assignee';
+import { computeValuePricing, roundUpToNearestThousand } from '@/lib/quotes/value-pricing';
 
 // GET - Get single quote with line items
 export async function GET(
@@ -50,11 +51,95 @@ export async function GET(
       .eq('quote_id', id)
       .order('order_index', { ascending: true });
 
+    const { data: milestones } = await supabase
+      .from('quote_milestones')
+      .select('*')
+      .eq('quote_id', id)
+      .order('order_index', { ascending: true });
+
+    let quoteMilestones = milestones || [];
+    if (quoteMilestones.length === 0 && quote.project_id) {
+      const { data: projectMilestones } = await supabase
+        .from('project_milestones')
+        .select('title, description, order_index')
+        .eq('project_id', quote.project_id)
+        .order('order_index', { ascending: true });
+      quoteMilestones = (projectMilestones || []).map((m, idx) => ({
+        id: `project-${idx}`,
+        quote_id: id,
+        title: m.title,
+        description: m.description,
+        estimated_hours: null,
+        order_index: m.order_index ?? idx,
+      }));
+    }
+
+    const quoteResponse = { ...quote };
+
+    if (
+      quote.project_id &&
+      (!quote.client_first_name ||
+        !quote.client_last_name ||
+        !quote.client_email ||
+        !quote.client_company_name)
+    ) {
+      const { data: projectOwner } = await supabase
+        .from('projects')
+        .select('user_id')
+        .eq('id', quote.project_id)
+        .maybeSingle();
+      if (projectOwner?.user_id) {
+        const { data: ownerProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, email, company_name')
+          .eq('id', projectOwner.user_id)
+          .maybeSingle();
+        (quoteResponse as any).client_first_name =
+          quote.client_first_name || ownerProfile?.first_name || null;
+        (quoteResponse as any).client_last_name =
+          quote.client_last_name || ownerProfile?.last_name || null;
+        (quoteResponse as any).client_email = quote.client_email || ownerProfile?.email || null;
+        (quoteResponse as any).client_company_name =
+          quote.client_company_name || ownerProfile?.company_name || null;
+      }
+    }
+
+    // PM/internal helper: pull baseline hours from matching service template.
+    if (isQuoteManager(platformRole)) {
+      const { data: templateMatch } = await supabase
+        .from('service_templates')
+        .select('estimated_hours')
+        .eq('name', quote.service_type)
+        .maybeSingle();
+      (quoteResponse as any).baseline_hours = templateMatch?.estimated_hours ?? null;
+    }
+
+    if (!isQuoteManager(platformRole)) {
+      delete (quoteResponse as any).adjusted_hours;
+      delete (quoteResponse as any).estimated_hours_low;
+      delete (quoteResponse as any).estimated_hours_high;
+      delete (quoteResponse as any).internal_hourly_rate;
+      delete (quoteResponse as any).pass_through_costs;
+      delete (quoteResponse as any).desired_margin_percent;
+      delete (quoteResponse as any).certainty_buffer_percent;
+      delete (quoteResponse as any).certainty_premium;
+      delete (quoteResponse as any).value_adjustment;
+      delete (quoteResponse as any).value_anchor_price;
+      delete (quoteResponse as any).value_confidence_score;
+      delete (quoteResponse as any).pricing_rationale;
+      delete (quoteResponse as any).floor_price;
+      quoteMilestones = quoteMilestones.map((m: any) => ({
+        ...m,
+        estimated_hours: null,
+      }));
+    }
+
     return NextResponse.json(
       {
         quote: {
-          ...quote,
+          ...quoteResponse,
           line_items: lineItems || [],
+          milestones: quoteMilestones,
         },
       },
       { status: 200 }
@@ -108,6 +193,53 @@ export async function PATCH(
       if (body.pm_notes !== undefined) updateData.pm_notes = body.pm_notes;
       if (body.assigned_lead_user_id !== undefined)
         updateData.assigned_lead_user_id = body.assigned_lead_user_id;
+      if (body.pricing_rationale !== undefined)
+        updateData.pricing_rationale = body.pricing_rationale || null;
+      if (body.client_info) {
+        if (body.client_info.first_name !== undefined)
+          updateData.client_first_name = body.client_info.first_name || null;
+        if (body.client_info.last_name !== undefined)
+          updateData.client_last_name = body.client_info.last_name || null;
+        if (body.client_info.email !== undefined)
+          updateData.client_email = body.client_info.email || null;
+        if (body.client_info.company_name !== undefined)
+          updateData.client_company_name = body.client_info.company_name || null;
+      }
+      if (body.value_pricing) {
+        const vp = body.value_pricing;
+        const pricing = computeValuePricing({
+          adjustedHours: Number(vp.adjusted_hours || 0),
+          estimatedHoursLow: Number(vp.estimated_hours_low || 0),
+          estimatedHoursHigh: Number(vp.estimated_hours_high || 0),
+          internalHourlyRate: Number(vp.internal_hourly_rate || 0),
+          passThroughCosts: Number(vp.pass_through_costs || 0),
+          desiredMarginPercent: Number(vp.desired_margin_percent || 0),
+          certaintyBufferPercent: Number(vp.certainty_buffer_percent || 0),
+          valueAdjustment: Number(vp.value_adjustment || 0),
+          valueAnchorPrice: Number(vp.value_anchor_price || 0),
+          valueConfidenceScore: Number(vp.value_confidence_score || 0),
+        });
+
+        updateData.adjusted_hours = Number(vp.adjusted_hours || 0);
+        updateData.estimated_hours_low = Number(vp.estimated_hours_low || 0);
+        updateData.estimated_hours_high = Number(vp.estimated_hours_high || 0);
+        updateData.internal_hourly_rate = Number(vp.internal_hourly_rate || 0);
+        updateData.pass_through_costs = Number(vp.pass_through_costs || 0);
+        updateData.desired_margin_percent = Number(vp.desired_margin_percent || 0);
+        updateData.certainty_buffer_percent = Number(vp.certainty_buffer_percent || 0);
+        updateData.certainty_premium = pricing.certaintyPremium;
+        updateData.value_adjustment = Number(vp.value_adjustment || 0);
+        updateData.value_anchor_price = Number(vp.value_anchor_price || 0);
+        updateData.value_confidence_score = Number(vp.value_confidence_score || 0);
+        updateData.desired_future_state = vp.desired_future_state || null;
+        updateData.success_metrics = vp.success_metrics || null;
+        updateData.estimated_value = vp.estimated_value ? Number(vp.estimated_value) : null;
+        updateData.floor_price = pricing.floor;
+        updateData.final_price =
+          body.final_price !== undefined && body.final_price !== null
+            ? roundUpToNearestThousand(Number(body.final_price))
+            : pricing.finalPrice;
+      }
 
       // PM review
       if (body.status === 'pending_customer_approval' && existingQuote.status === 'pending_pm_review') {
@@ -194,6 +326,38 @@ export async function PATCH(
     if (error) {
       console.error('Error updating quote:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (isQuoteManager(platformRole) && Array.isArray(body.milestones)) {
+      const milestones = body.milestones
+        .map((m: any, index: number) => ({
+          quote_id: id,
+          title: typeof m?.title === 'string' ? m.title.trim() : '',
+          description: typeof m?.description === 'string' ? m.description : null,
+          estimated_hours:
+            m?.estimated_hours !== undefined && m?.estimated_hours !== null
+              ? Number(m.estimated_hours)
+              : null,
+          order_index: index,
+        }))
+        .filter((m: any) => m.title.length > 0);
+
+      const { error: clearMilestonesError } = await supabase
+        .from('quote_milestones')
+        .delete()
+        .eq('quote_id', id);
+      if (clearMilestonesError) {
+        return NextResponse.json({ error: clearMilestonesError.message }, { status: 500 });
+      }
+
+      if (milestones.length > 0) {
+        const { error: insertMilestonesError } = await supabase
+          .from('quote_milestones')
+          .insert(milestones);
+        if (insertMilestonesError) {
+          return NextResponse.json({ error: insertMilestonesError.message }, { status: 500 });
+        }
+      }
     }
 
     // If approved, create project (workspace + committed cost)

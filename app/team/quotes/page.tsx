@@ -6,6 +6,16 @@ import { isQuoteManager } from '@/lib/auth/platform-role';
 
 export const dynamic = 'force-dynamic';
 
+function getStatusMeta(status: string) {
+  if (status === 'approved') {
+    return { label: 'Accepted', classes: 'bg-green-100 text-green-700' };
+  }
+  if (status === 'rejected') {
+    return { label: 'Rejected', classes: 'bg-red-100 text-red-700' };
+  }
+  return { label: 'Pending', classes: 'bg-amber-100 text-amber-700' };
+}
+
 export default async function TeamQuotesPage() {
   const supabase = await createClient();
   const {
@@ -23,7 +33,7 @@ export default async function TeamQuotesPage() {
 
   const { data: quotes, error } = await supabase
     .from('quotes')
-    .select('id, title, status, category, service_type, final_price, estimated_price, currency, created_at, user_id')
+    .select('id, title, status, category, service_type, final_price, estimated_price, currency, created_at, reviewed_at, user_id')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -67,8 +77,25 @@ export default async function TeamQuotesPage() {
             ) : (
               (quotes ?? []).map((q) => (
                 <tr key={q.id} className="hover:bg-gray-50/80">
-                  <td className="px-4 py-3 font-medium text-gray-900">{q.title}</td>
-                  <td className="px-4 py-3 text-gray-600">{q.status?.replace(/_/g, ' ')}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    <Link href={`/team/quotes/${q.id}`} className="hover:underline">
+                      {q.title}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusMeta(q.status).classes}`}
+                      >
+                        {getStatusMeta(q.status).label}
+                      </span>
+                      {q.status === 'pending_pm_review' && (
+                        <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                          New
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-gray-600">
                     {q.category} · {q.service_type}
                   </td>

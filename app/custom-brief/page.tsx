@@ -27,13 +27,7 @@ export default function CustomBriefPage() {
     setLoading(true);
 
     try {
-      // Create a quote from the custom brief
-      const response = await fetch('/api/quotes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: formData.projectName,
-          description: `
+      const briefDescription = `
 **Company:** ${formData.companyName}
 **Industry:** ${formData.industryOrSector || 'N/A'}
 
@@ -57,7 +51,32 @@ ${formData.technicalRequirements || 'Not specified'}
 
 **Additional Context:**
 ${formData.additionalContext || 'Not specified'}
-          `.trim(),
+      `.trim();
+
+      // Create project first so quote client info is sourced from project ownership.
+      const projectResponse = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.projectName,
+          description: briefDescription,
+          category: 'Custom Services',
+          service_type: 'Custom Brief',
+        }),
+      });
+      const projectData = await projectResponse.json();
+      if (!projectResponse.ok || !projectData.project?.id) {
+        throw new Error(projectData.error || 'Failed to create project from brief');
+      }
+
+      // Create a quote from the custom brief and link it to the project.
+      const response = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: formData.projectName,
+          description: briefDescription,
+          project_id: projectData.project.id,
           category: 'Custom Services',
           service_type: 'Custom Brief',
         }),

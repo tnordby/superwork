@@ -13,6 +13,10 @@ export interface Quote {
   id: string;
   user_id: string;
   project_id: string | null;
+  client_first_name: string | null;
+  client_last_name: string | null;
+  client_email: string | null;
+  client_company_name: string | null;
 
   // Quote details
   title: string;
@@ -24,6 +28,23 @@ export interface Quote {
   estimated_price: number | null;
   final_price: number | null;
   currency: string;
+  floor_price: number | null;
+  adjusted_hours: number | null;
+  estimated_hours_low: number | null;
+  estimated_hours_high: number | null;
+  internal_hourly_rate: number | null;
+  pass_through_costs: number | null;
+  desired_margin_percent: number | null;
+  certainty_buffer_percent: number | null;
+  certainty_premium: number | null;
+  value_adjustment: number | null;
+  value_anchor_price: number | null;
+  value_confidence_score: number | null;
+  pricing_rationale: string | null;
+  desired_future_state: string | null;
+  success_metrics: string | null;
+  estimated_value: number | null;
+  baseline_hours?: number | null;
 
   // Status tracking
   status: QuoteStatus;
@@ -66,6 +87,22 @@ export interface QuoteUpdate {
   service_type?: string;
   estimated_price?: number;
   final_price?: number;
+  floor_price?: number;
+  adjusted_hours?: number;
+  estimated_hours_low?: number;
+  estimated_hours_high?: number;
+  internal_hourly_rate?: number;
+  pass_through_costs?: number;
+  desired_margin_percent?: number;
+  certainty_buffer_percent?: number;
+  certainty_premium?: number;
+  value_adjustment?: number;
+  value_anchor_price?: number;
+  value_confidence_score?: number;
+  pricing_rationale?: string;
+  desired_future_state?: string;
+  success_metrics?: string;
+  estimated_value?: number;
   status?: QuoteStatus;
   assigned_lead_user_id?: string;
   assignment_locked?: boolean;
@@ -140,6 +177,7 @@ export interface LineItemUpdate {
 // Quote with line items
 export interface QuoteWithLineItems extends Quote {
   line_items: QuoteLineItem[];
+  milestones?: QuoteMilestone[];
 }
 
 // Quote with assignments
@@ -159,4 +197,15 @@ export interface UserInfo {
 // Assignment with user info
 export interface AssignmentWithUser extends ProjectAssignment {
   user: UserInfo;
+}
+
+export interface QuoteMilestone {
+  id: string;
+  quote_id: string;
+  title: string;
+  description: string | null;
+  estimated_hours: number | null;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
 }
