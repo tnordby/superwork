@@ -4,11 +4,21 @@ import { useState, useEffect, useRef } from 'react';
 import { Upload, FileText, Image as ImageIcon, File, Download, Trash2, Search, FolderOpen, Loader2 } from 'lucide-react';
 import { Asset, Workspace } from '@/types/assets';
 
-function AssetImagePreview({ assetId }: { assetId: string }) {
+function AssetImagePreview({
+  assetId,
+  hovered,
+}: {
+  assetId: string;
+  hovered: boolean;
+}) {
   const [src, setSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!hovered) return;
+    if (src) return;
+    if (loading) return;
+
     let active = true;
     setLoading(true);
     fetch(`/api/assets/${assetId}/preview`, { credentials: 'include' })
@@ -33,7 +43,12 @@ function AssetImagePreview({ assetId }: { assetId: string }) {
     return () => {
       active = false;
     };
-  }, [assetId]);
+  }, [assetId, hovered, src, loading]);
+
+  // Only show the preview while hovering; cache stays in component state.
+  if (!hovered) {
+    return <ImageIcon className="h-5 w-5" />;
+  }
 
   if (src) {
     return <img src={src} alt="" className="h-16 w-16 rounded-xl object-cover" />;
@@ -55,6 +70,7 @@ export default function AssetsPage() {
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [hoveredAssetId, setHoveredAssetId] = useState<string | null>(null);
   const dragDepth = useRef(0);
 
   // Load workspaces and assets on mount
@@ -399,12 +415,21 @@ export default function AssetsPage() {
                   className={`mb-4 flex h-16 w-16 items-center justify-center rounded-xl ${getFileColor(
                     asset.file_type
                   )}`}
+                  onMouseEnter={() => {
+                    if (asset.file_type === 'image') setHoveredAssetId(asset.id);
+                  }}
+                  onMouseLeave={() => {
+                    if (hoveredAssetId === asset.id) setHoveredAssetId(null);
+                  }}
                 >
-                {asset.file_type === 'image' ? (
-                  <AssetImagePreview assetId={asset.id} />
-                ) : (
-                  getFileIcon(asset.file_type)
-                )}
+                  {asset.file_type === 'image'
+                    ? (
+                        <AssetImagePreview
+                          assetId={asset.id}
+                          hovered={hoveredAssetId === asset.id}
+                        />
+                      )
+                    : getFileIcon(asset.file_type)}
                 </div>
 
                 {/* File Info */}
