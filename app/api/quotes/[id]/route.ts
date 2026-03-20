@@ -6,6 +6,7 @@ import {
 } from '@/lib/billing/workspace-budget';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isQuoteManager } from '@/lib/auth/platform-role';
+import { validateQuoteAssignee } from '@/lib/auth/quote-assignee';
 
 // GET - Get single quote with line items
 export async function GET(
@@ -165,6 +166,21 @@ export async function PATCH(
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No valid updates provided' }, { status: 400 });
+    }
+
+    if (
+      updateData.assigned_lead_user_id !== undefined &&
+      updateData.assigned_lead_user_id !== null
+    ) {
+      const assigneeValidation = await validateQuoteAssignee(
+        updateData.assigned_lead_user_id
+      );
+      if (!assigneeValidation.ok) {
+        return NextResponse.json(
+          { error: assigneeValidation.reason || 'Invalid assignee' },
+          { status: 400 }
+        );
+      }
     }
 
     // Update quote

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isQuoteManager } from '@/lib/auth/platform-role';
+import { validateQuoteAssignee } from '@/lib/auth/quote-assignee';
 
 // POST - Assign consultant to quote
 export async function POST(
@@ -31,6 +32,14 @@ export async function POST(
 
     if (!body.user_id) {
       return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
+    }
+
+    const assigneeValidation = await validateQuoteAssignee(body.user_id);
+    if (!assigneeValidation.ok) {
+      return NextResponse.json(
+        { error: assigneeValidation.reason || 'Invalid assignee' },
+        { status: 400 }
+      );
     }
 
     // Fetch quote

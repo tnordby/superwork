@@ -51,14 +51,14 @@ function AssetImagePreview({
   }
 
   if (src) {
-    return <img src={src} alt="" className="h-16 w-16 rounded-xl object-cover" />;
+    return <img src={src} alt="" className="h-full w-full rounded-xl object-cover" />;
   }
 
   if (loading) {
-    return <Loader2 className="h-6 w-6 text-gray-400 animate-spin" />;
+    return <Loader2 className="h-10 w-10 text-gray-500 animate-spin" />;
   }
 
-  return <ImageIcon className="h-5 w-5" />;
+  return <ImageIcon className="h-14 w-14" />;
 }
 
 export default function AssetsPage() {
@@ -236,13 +236,30 @@ export default function AssetsPage() {
     switch (type) {
       case 'logo':
       case 'image':
-        return <ImageIcon className="h-5 w-5" />;
+        return <ImageIcon className="h-14 w-14" />;
       case 'pdf':
-        return <FileText className="h-5 w-5" />;
+        return <FileText className="h-14 w-14" />;
       case 'font':
-        return <File className="h-5 w-5" />;
+        return <File className="h-14 w-14" />;
       default:
-        return <File className="h-5 w-5" />;
+        return <File className="h-14 w-14" />;
+    }
+  };
+
+  const getFileTypeLabel = (type: Asset['file_type']) => {
+    switch (type) {
+      case 'image':
+        return 'Image';
+      case 'logo':
+        return 'Logo';
+      case 'pdf':
+        return 'PDF';
+      case 'font':
+        return 'Font';
+      case 'document':
+        return 'Document';
+      default:
+        return 'File';
     }
   };
 
@@ -471,7 +488,7 @@ export default function AssetsPage() {
               >
                 {/* File Icon */}
                 <div
-                  className={`mb-4 flex h-16 w-16 items-center justify-center rounded-xl ${getFileColor(
+                  className={`mb-4 relative flex h-36 w-full items-center justify-center overflow-hidden rounded-xl ${getFileColor(
                     asset.file_type
                   )}`}
                   onMouseEnter={() => {
@@ -489,6 +506,9 @@ export default function AssetsPage() {
                         />
                       )
                     : getFileIcon(asset.file_type)}
+                  <span className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                    {getFileTypeLabel(asset.file_type)}
+                  </span>
                 </div>
 
                 {/* File Info */}
