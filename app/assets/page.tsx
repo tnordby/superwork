@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Upload, FileText, Image as ImageIcon, File, Download, Trash2, Search, FolderOpen, Loader2 } from 'lucide-react';
-import { Asset, Workspace } from '@/types/assets';
+import { Asset, Workspace, AssetCategory } from '@/types/assets';
 
 function AssetImagePreview({
   assetId,
@@ -65,6 +65,8 @@ export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+  const [assetCategories, setAssetCategories] = useState<AssetCategory[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
@@ -77,6 +79,40 @@ export default function AssetsPage() {
   useEffect(() => {
     loadWorkspaces();
     loadAssets();
+  }, [selectedWorkspace]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadCategories() {
+      if (!selectedWorkspace) {
+        setAssetCategories([]);
+        setSelectedCategory('');
+        return;
+      }
+
+      const response = await fetch(
+        `/api/assets/categories?workspace_id=${selectedWorkspace}`,
+        { credentials: 'include' }
+      );
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        console.error('Failed to load asset categories', response.status, body);
+        return;
+      }
+
+      const data = await response.json();
+      if (!active) return;
+      setAssetCategories(data.categories || []);
+      setSelectedCategory('');
+    }
+
+    loadCategories();
+
+    return () => {
+      active = false;
+    };
   }, [selectedWorkspace]);
 
   const loadWorkspaces = async () => {
@@ -149,6 +185,9 @@ export default function AssetsPage() {
           selectedWorkspace ?? (workspaces.length === 1 ? workspaces[0].id : null);
         if (workspaceForUpload) {
           formData.append('workspace_id', workspaceForUpload);
+        }
+        if (selectedCategory) {
+          formData.append('category', selectedCategory);
         }
         formData.append('visibility', 'workspace');
 
@@ -288,6 +327,26 @@ export default function AssetsPage() {
 
       {/* Upload Area */}
       <div className="mb-8">
+        {/* Asset category (only meaningful when a specific workspace is selected) */}
+        {selectedWorkspace && assetCategories.length > 0 && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category
+            </label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full md:w-64 rounded-xl border border-gray-200 bg-white py-2 px-4 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+            >
+              <option value="">No category</option>
+              {assetCategories.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <label
           htmlFor="file-upload"
           className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 p-12 transition-all ${
