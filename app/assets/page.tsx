@@ -1,8 +1,50 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Upload, FileText, Image as ImageIcon, File, Download, Trash2, Search, FolderOpen, Loader2 } from 'lucide-react';
 import { Asset, Workspace } from '@/types/assets';
+
+function AssetImagePreview({ assetId }: { assetId: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetch(`/api/assets/${assetId}/preview`, { credentials: 'include' })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`preview request failed: ${r.status}`);
+        const data = await r.json();
+        return data.preview_url as string | undefined;
+      })
+      .then((url) => {
+        if (!active) return;
+        setSrc(url ?? null);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSrc(null);
+      })
+      .finally(() => {
+        if (!active) return;
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [assetId]);
+
+  if (src) {
+    return <img src={src} alt="" className="h-16 w-16 rounded-xl object-cover" />;
+  }
+
+  if (loading) {
+    return <Loader2 className="h-6 w-6 text-gray-400 animate-spin" />;
+  }
+
+  return <ImageIcon className="h-5 w-5" />;
+}
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -12,6 +54,8 @@ export default function AssetsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragDepth = useRef(0);
 
   // Load workspaces and assets on mount
   useEffect(() => {
@@ -69,14 +113,15 @@ export default function AssetsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+  const uploadFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.isArray(files) ? files : Array.from(files);
+    if (fileArray.length === 0) return;
+    if (isUploading) return;
 
     setIsUploading(true);
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
       const fileKey = `${file.name}-${Date.now()}`;
 
       try {
@@ -104,7 +149,11 @@ export default function AssetsPage() {
           const error = await response.json().catch(() => ({}));
           const detail =
             typeof error.details === 'string' ? `\n\n${error.details}` : '';
-          alert(`Failed to upload ${file.name}: ${error.error || response.statusText}${detail}`);
+          alert(
+            `Failed to upload ${file.name}: ${
+              error.error || response.statusText
+            }${detail}`
+          );
         }
       } catch (error) {
         console.error('Upload error:', error);
@@ -121,6 +170,10 @@ export default function AssetsPage() {
     }
 
     setIsUploading(false);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    await uploadFiles(event.target.files || []);
     event.target.value = '';
   };
 
@@ -222,8 +275,38 @@ export default function AssetsPage() {
         <label
           htmlFor="file-upload"
           className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 p-12 transition-all ${
-            isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-400 hover:bg-gray-100'
+            isUploading
+              ? 'opacity-50 cursor-not-allowed'
+              : isDragOver
+                ? 'border-[#bfe937] bg-[#f3ffe0] hover:border-[#bfe937]'
+                : 'hover:border-gray-400 hover:bg-gray-100'
           }`}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            if (isUploading) return;
+            dragDepth.current += 1;
+            setIsDragOver(true);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (isUploading) return;
+            if (!isDragOver) setIsDragOver(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            dragDepth.current = Math.max(0, dragDepth.current - 1);
+            if (dragDepth.current === 0) setIsDragOver(false);
+          }}
+          onDrop={async (e) => {
+            e.preventDefault();
+            dragDepth.current = 0;
+            setIsDragOver(false);
+            if (isUploading) return;
+
+            const droppedFiles = e.dataTransfer.files;
+            if (!droppedFiles || droppedFiles.length === 0) return;
+            await uploadFiles(droppedFiles);
+          }}
         >
           <div className="flex flex-col items-center text-center">
             <div className="mb-4 rounded-full bg-[#bfe937] p-4 transition-transform group-hover:scale-110">
@@ -317,7 +400,11 @@ export default function AssetsPage() {
                     asset.file_type
                   )}`}
                 >
-                  {getFileIcon(asset.file_type)}
+                {asset.file_type === 'image' ? (
+                  <AssetImagePreview assetId={asset.id} />
+                ) : (
+                  getFileIcon(asset.file_type)
+                )}
                 </div>
 
                 {/* File Info */}
