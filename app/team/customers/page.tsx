@@ -1,44 +1,20 @@
+import Link from 'next/link';
 import { BadgeCheck, CircleOff, Users } from 'lucide-react';
+import { loadCustomersOverview } from '@/lib/team/customers-overview';
 
-const placeholderCustomers = [
-  {
-    id: 'cust_1',
-    name: 'Acme Labs',
-    status: 'active',
-    projectManager: 'Emma Johnson',
-    consultants: ['Liam Carter', 'Noah Patel'],
-  },
-  {
-    id: 'cust_2',
-    name: 'Northstar Health',
-    status: 'active',
-    projectManager: 'Sofia Andersson',
-    consultants: ['Olivia Chen'],
-  },
-  {
-    id: 'cust_3',
-    name: 'BrightPath SaaS',
-    status: 'inactive',
-    projectManager: 'Emma Johnson',
-    consultants: ['Mason Reed'],
-  },
-  {
-    id: 'cust_4',
-    name: 'Summit Retail Group',
-    status: 'active',
-    projectManager: 'Lucas Berg',
-    consultants: ['Ava Kim', 'Ethan Brooks'],
-  },
-  {
-    id: 'cust_5',
-    name: 'Evergreen Logistics',
-    status: 'inactive',
-    projectManager: 'Sofia Andersson',
-    consultants: ['Mia Torres'],
-  },
-];
+export const dynamic = 'force-dynamic';
 
-export default function TeamCustomersPage() {
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export default async function TeamCustomersPage() {
+  const { rows } = await loadCustomersOverview();
+
   return (
     <div className="p-8 space-y-6">
       <div>
@@ -51,18 +27,18 @@ export default function TeamCustomersPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <p className="text-xs uppercase tracking-wide text-gray-500">Total customers</p>
-          <p className="mt-2 text-2xl font-semibold text-gray-900">{placeholderCustomers.length}</p>
+          <p className="mt-2 text-2xl font-semibold text-gray-900">{rows.length}</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <p className="text-xs uppercase tracking-wide text-gray-500">Active</p>
           <p className="mt-2 text-2xl font-semibold text-green-700">
-            {placeholderCustomers.filter((c) => c.status === 'active').length}
+            {rows.filter((c) => c.status === 'active').length}
           </p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <p className="text-xs uppercase tracking-wide text-gray-500">Inactive</p>
           <p className="mt-2 text-2xl font-semibold text-gray-600">
-            {placeholderCustomers.filter((c) => c.status === 'inactive').length}
+            {rows.filter((c) => c.status === 'inactive').length}
           </p>
         </div>
       </div>
@@ -75,15 +51,22 @@ export default function TeamCustomersPage() {
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">Project manager</th>
               <th className="px-4 py-3 text-left font-medium">Consultants</th>
+              <th className="px-4 py-3 text-right font-medium">MRR</th>
+              <th className="px-4 py-3 text-right font-medium">ARR</th>
             </tr>
           </thead>
           <tbody>
-            {placeholderCustomers.map((customer) => (
+            {rows.map((customer) => (
               <tr key={customer.id} className="border-t border-gray-100">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-gray-500" />
-                    <span className="font-medium text-gray-900">{customer.name}</span>
+                    <Link
+                      href={`/team/customers/${customer.id}`}
+                      className="font-medium text-gray-900 underline-offset-2 hover:underline"
+                    >
+                      {customer.name}
+                    </Link>
                   </div>
                 </td>
                 <td className="px-4 py-3">
@@ -100,9 +83,24 @@ export default function TeamCustomersPage() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-gray-700">{customer.projectManager}</td>
-                <td className="px-4 py-3 text-gray-700">{customer.consultants.join(', ')}</td>
+                <td className="px-4 py-3 text-gray-700">
+                  {customer.consultants.length > 0 ? customer.consultants.join(', ') : 'Unassigned'}
+                </td>
+                <td className="px-4 py-3 text-right font-medium text-gray-900">
+                  {formatCurrency(customer.mrr)}
+                </td>
+                <td className="px-4 py-3 text-right font-medium text-gray-900">
+                  {formatCurrency(customer.arr)}
+                </td>
               </tr>
             ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                  No customers found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

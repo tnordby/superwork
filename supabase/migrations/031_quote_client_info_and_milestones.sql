@@ -52,5 +52,5 @@ drop trigger if exists quote_milestones_set_updated_at on public.quote_milestone
 create trigger quote_milestones_set_updated_at
 before update on public.quote_milestones
 for each row
-execute function public.set_updated_at();
+execute function public.handle_updated_at();
 

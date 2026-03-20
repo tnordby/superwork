@@ -9,6 +9,23 @@ import { isQuoteManager } from '@/lib/auth/platform-role';
 import { validateQuoteAssignee } from '@/lib/auth/quote-assignee';
 import { computeValuePricing, roundUpToNearestThousand } from '@/lib/quotes/value-pricing';
 
+const QUOTE_OPTIONAL_PRICING_COLUMNS = new Set([
+  'estimated_hours_low',
+  'estimated_hours_high',
+  'pass_through_costs',
+  'certainty_buffer_percent',
+  'certainty_premium',
+  'value_anchor_price',
+  'value_confidence_score',
+  'pricing_rationale',
+]);
+
+function extractMissingQuotesColumn(errorMessage: string | undefined): string | null {
+  if (!errorMessage) return null;
+  const match = errorMessage.match(/Could not find the '([^']+)' column of 'quotes'/i);
+  return match?.[1] ?? null;
+}
+
 // GET - Get single quote with line items
 export async function GET(
   request: NextRequest,
@@ -315,17 +332,37 @@ export async function PATCH(
       }
     }
 
-    // Update quote
-    const { data: quote, error } = await supabase
-      .from('quotes')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+    // Update quote (with graceful fallback if DB is behind on optional pricing columns)
+    let quote: any = null;
+    let updateError: any = null;
+    const safeUpdateData = { ...updateData };
 
-    if (error) {
-      console.error('Error updating quote:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    while (true) {
+      const { data, error } = await supabase
+        .from('quotes')
+        .update(safeUpdateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (!error) {
+        quote = data;
+        break;
+      }
+
+      const missingColumn = extractMissingQuotesColumn(error.message);
+      if (missingColumn && QUOTE_OPTIONAL_PRICING_COLUMNS.has(missingColumn)) {
+        delete safeUpdateData[missingColumn];
+        continue;
+      }
+
+      updateError = error;
+      break;
+    }
+
+    if (updateError || !quote) {
+      console.error('Error updating quote:', updateError);
+      return NextResponse.json({ error: updateError?.message || 'Failed to update quote' }, { status: 500 });
     }
 
     if (isQuoteManager(platformRole) && Array.isArray(body.milestones)) {
