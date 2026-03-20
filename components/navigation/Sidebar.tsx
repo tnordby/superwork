@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -30,6 +30,7 @@ import {
   Shield,
   Zap,
   ClipboardList,
+  Repeat2,
 } from 'lucide-react';
 import { normalizePlatformRole, isAdmin as isAdminRole, isQuoteManager } from '@/lib/auth/platform-role';
 
@@ -93,9 +94,33 @@ export function Sidebar() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Projects', 'Account', 'Workspace']));
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { signOut, user, platformRole } = useAuth();
+  const [selectedClientId, setSelectedClientId] = useState('acme');
 
   const effectiveRole = platformRole ?? normalizePlatformRole(user?.user_metadata?.role);
   const useInternalShell = effectiveRole !== 'customer';
+  const canSwitchClient = useInternalShell;
+
+  const clientSwitcherOptions = useMemo(
+    () => [
+      { id: 'acme', name: 'Acme Labs' },
+      { id: 'northstar', name: 'Northstar Health' },
+      { id: 'brightpath', name: 'BrightPath SaaS' },
+      { id: 'summit', name: 'Summit Retail Group' },
+      { id: 'evergreen', name: 'Evergreen Logistics' },
+    ],
+    []
+  );
+
+  useEffect(() => {
+    if (!canSwitchClient) return;
+    const stored = window.localStorage.getItem('internal_selected_client_id');
+    if (stored && clientSwitcherOptions.some((c) => c.id === stored)) {
+      setSelectedClientId(stored);
+    }
+  }, [canSwitchClient, clientSwitcherOptions]);
+
+  const selectedClientName =
+    clientSwitcherOptions.find((c) => c.id === selectedClientId)?.name || 'Select client';
 
   const dynamicNavigationItems: (NavItem | ExpandableNavItem)[] = useMemo(() => {
     if (!useInternalShell) {
@@ -119,6 +144,7 @@ export function Sidebar() {
     if (isQuoteManager(effectiveRole)) {
       items.push({ label: 'Quotes', href: '/team/quotes', icon: ClipboardList });
     }
+    items.push({ label: 'Customers', href: '/team/customers', icon: Users });
 
     if (isAdminRole(effectiveRole)) {
       items.push({ label: 'Admin', href: '/admin', icon: Shield });
@@ -207,6 +233,42 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
+          {canSwitchClient && !isCollapsed && (
+            <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                Client View
+              </p>
+              <div className="flex items-center gap-2">
+                <Repeat2 className="h-4 w-4 text-gray-400" />
+                <select
+                  value={selectedClientId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setSelectedClientId(nextId);
+                    window.localStorage.setItem('internal_selected_client_id', nextId);
+                  }}
+                  className="w-full rounded-md border border-white/10 bg-[#1f2a3a] px-2 py-1.5 text-xs text-gray-100 focus:outline-none"
+                  aria-label="Switch client context"
+                >
+                  {clientSwitcherOptions.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+          {canSwitchClient && isCollapsed && (
+            <div className="mb-3 flex justify-center">
+              <div
+                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-gray-300"
+                title={`Client: ${selectedClientName}`}
+              >
+                <Repeat2 className="h-4 w-4" />
+              </div>
+            </div>
+          )}
           <ul className="space-y-1">
             {dynamicNavigationItems.map((item) => {
               if (isExpandableNavItem(item)) {
