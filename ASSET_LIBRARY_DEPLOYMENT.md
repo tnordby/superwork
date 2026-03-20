@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide will walk you through deploying the Shared Asset Library feature that enables clients and consultants to upload, manage, and share assets like brand logos, PDFs, and fonts.
+This guide will walk you through deploying the Shared Asset Library feature that enables clients and consultants to upload and manage assets like brand logos, PDFs, and fonts.
 
 ---
 
@@ -103,7 +103,6 @@ No deployment needed - Next.js API routes are automatically available.
 - `/api/assets/upload` - Upload assets
 - `/api/assets/[id]` - Get/update/delete individual asset
 - `/api/assets/[id]/download` - Download asset
-- `/api/assets/[id]/share` - Share asset
 - `/api/workspaces` - Manage workspaces
 
 ---
@@ -166,14 +165,6 @@ Replace `your-user-id-here` with your actual user ID (get it from `auth.users` t
 1. Click the **Download** button on an asset
 2. Verify the file downloads correctly
 
-### 6.4 Test Asset Sharing
-
-1. Click the **Share** button (blue icon) on an asset
-2. Enter an email address of another user
-3. Select permission level (View/Download/Edit/Manage)
-4. Click **Share**
-5. Verify the share appears in the list
-
 ### 6.5 Test Asset Deletion
 
 1. Click the **Delete** button (red trash icon) on an asset
@@ -218,14 +209,6 @@ This creates default categories:
 - Verify RLS policies are correctly set on the `assets` table
 - Check that you're authenticated (run `supabase.auth.getUser()` in console)
 - Verify workspace membership if filtering by workspace
-
-### Issue: Cannot share assets
-
-**Solution:**
-- Verify the `asset_shares` table exists
-- Check RLS policies on `asset_shares` table
-- Ensure the target user exists in the database
-- Currently, sharing requires the user_id - you may need to create a lookup endpoint for email-to-user_id
 
 ### Issue: Download URLs not working
 
@@ -411,30 +394,6 @@ Get a signed download URL for an asset.
 }
 ```
 
-### GET /api/assets/[id]/share
-
-List users who have access to an asset.
-
-### POST /api/assets/[id]/share
-
-Share an asset with a user.
-
-**Request:**
-```typescript
-{
-  user_id: string
-  permission_level: 'view' | 'download' | 'edit' | 'manage'
-  expires_at?: string
-}
-```
-
-### DELETE /api/assets/[id]/share
-
-Remove a user's access to an asset.
-
-**Query Parameters:**
-- `share_id` - ID of the share to remove
-
 ---
 
 ## Support
@@ -453,13 +412,13 @@ If you encounter issues:
 You've successfully deployed the Shared Asset Library!
 
 **What's been created:**
-- ✅ Database schema with workspaces and asset sharing
+- ✅ Database schema with workspaces and asset management
 - ✅ Supabase Storage bucket for file uploads
 - ✅ API routes for asset management
-- ✅ Frontend UI with upload, download, and sharing
+- ✅ Frontend UI with upload and download
 - ✅ RLS policies for secure access control
 
 **Next steps:**
 1. Create workspaces for your clients
 2. Invite team members to workspaces
-3. Start uploading and sharing assets!
+3. Start uploading assets!
