@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Upload, FileText, Image as ImageIcon, File, Download, Trash2, Search, FolderOpen, Share2, Loader2 } from 'lucide-react';
-import { Asset, Workspace, formatFileSize, FILE_TYPE_ICONS } from '@/types/assets';
-import AssetShareModal from '@/components/AssetShareModal';
+import { useState, useEffect } from 'react';
+import { Upload, FileText, Image as ImageIcon, File, Download, Trash2, Search, FolderOpen, Loader2 } from 'lucide-react';
+import { Asset, Workspace } from '@/types/assets';
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -13,8 +12,6 @@ export default function AssetsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [isUploading, setIsUploading] = useState(false);
-  const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
 
   // Load workspaces and assets on mount
   useEffect(() => {
@@ -24,7 +21,7 @@ export default function AssetsPage() {
 
   const loadWorkspaces = async () => {
     try {
-      const response = await fetch('/api/workspaces');
+      const response = await fetch('/api/workspaces', { credentials: 'include' });
       if (response.ok) {
         const data = await response.json();
         setWorkspaces(data.workspaces || []);
@@ -45,12 +42,15 @@ export default function AssetsPage() {
         params.append('search', searchQuery);
       }
 
-      const response = await fetch(`/api/assets?${params.toString()}`);
+      const response = await fetch(`/api/assets?${params.toString()}`, {
+        credentials: 'include',
+      });
       if (response.ok) {
         const data = await response.json();
         setAssets(data.assets || []);
       } else {
-        console.error('Failed to load assets');
+        const body = await response.json().catch(() => ({}));
+        console.error('Failed to load assets', response.status, body);
       }
     } catch (error) {
       console.error('Failed to load assets:', error);
@@ -84,22 +84,27 @@ export default function AssetsPage() {
 
         const formData = new FormData();
         formData.append('file', file);
-        if (selectedWorkspace) {
-          formData.append('workspace_id', selectedWorkspace);
+        const workspaceForUpload =
+          selectedWorkspace ?? (workspaces.length === 1 ? workspaces[0].id : null);
+        if (workspaceForUpload) {
+          formData.append('workspace_id', workspaceForUpload);
         }
         formData.append('visibility', 'workspace');
 
         const response = await fetch('/api/assets/upload', {
           method: 'POST',
           body: formData,
+          credentials: 'include',
         });
 
         if (response.ok) {
           setUploadProgress((prev) => ({ ...prev, [fileKey]: 100 }));
           await loadAssets();
         } else {
-          const error = await response.json();
-          alert(`Failed to upload ${file.name}: ${error.error}`);
+          const error = await response.json().catch(() => ({}));
+          const detail =
+            typeof error.details === 'string' ? `\n\n${error.details}` : '';
+          alert(`Failed to upload ${file.name}: ${error.error || response.statusText}${detail}`);
         }
       } catch (error) {
         console.error('Upload error:', error);
@@ -182,11 +187,6 @@ export default function AssetsPage() {
       console.error('Delete error:', error);
       alert('Failed to delete asset');
     }
-  };
-
-  const handleShare = (asset: Asset) => {
-    setSelectedAsset(asset);
-    setShareModalOpen(true);
   };
 
   return (
@@ -324,14 +324,6 @@ export default function AssetsPage() {
                 <h3 className="mb-1 truncate text-base font-semibold text-gray-900" title={asset.name}>
                   {asset.name}
                 </h3>
-                <p className="mb-2 text-sm text-gray-600">
-                  {formatFileSize(asset.file_size)} • {new Date(asset.created_at).toLocaleDateString()}
-                </p>
-                {asset.uploaded_by && (
-                  <p className="mb-3 text-xs text-gray-500">
-                    Uploaded by {asset.uploaded_by}
-                  </p>
-                )}
                 {asset.category && (
                   <span className="inline-block mb-3 text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
                     {asset.category}
@@ -345,12 +337,6 @@ export default function AssetsPage() {
                     className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
                   >
                     <Download className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleShare(asset)}
-                    className="flex items-center justify-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100"
-                  >
-                    <Share2 className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(asset.id, asset.name)}
@@ -373,17 +359,6 @@ export default function AssetsPage() {
         )}
       </div>
 
-      {/* Share Modal */}
-      {selectedAsset && (
-        <AssetShareModal
-          asset={selectedAsset}
-          isOpen={shareModalOpen}
-          onClose={() => {
-            setShareModalOpen(false);
-            setSelectedAsset(null);
-          }}
-        />
-      )}
     </div>
   );
 }

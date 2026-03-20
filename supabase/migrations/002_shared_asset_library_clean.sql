@@ -231,6 +231,26 @@ create policy "Workspace owners and admins can manage categories"
     )
   );
 
+-- Avoid RLS recursion: assets policy must not scan asset_shares directly (asset_shares policies read assets).
+create or replace function public.asset_share_exists_for_user(p_asset_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.asset_shares as s
+    where s.asset_id = p_asset_id
+      and s.shared_with_user_id = (select auth.uid())
+  );
+$$;
+
+revoke all on function public.asset_share_exists_for_user(uuid) from public;
+grant execute on function public.asset_share_exists_for_user(uuid) to authenticated;
+grant execute on function public.asset_share_exists_for_user(uuid) to service_role;
+
 -- ASSETS POLICIES
 create policy "Users can view assets in their workspaces"
   on public.assets for select
@@ -253,12 +273,8 @@ create policy "Users can view assets in their workspaces"
         )
       )
     )
-    -- Or assets shared with user
-    or exists (
-      select 1 from public.asset_shares
-      where asset_shares.asset_id = assets.id
-      and asset_shares.shared_with_user_id = auth.uid()
-    )
+    -- Or assets shared with user (via helper to break assets <-> asset_shares RLS cycle)
+    or public.asset_share_exists_for_user(assets.id)
   );
 
 create policy "Users can create assets in their workspaces"

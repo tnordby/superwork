@@ -234,6 +234,20 @@ export const ALLOWED_FILE_TYPES = {
   ],
 } as const;
 
+/** When the browser sends an empty type or application/octet-stream, infer from extension (must match bucket allow-list). */
+const EXTENSION_TO_CANONICAL_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+  pdf: 'application/pdf',
+  ttf: 'font/ttf',
+  otf: 'font/otf',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+};
+
 export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 export const FILE_TYPE_ICONS: Record<AssetFileType, string> = {
@@ -281,13 +295,36 @@ export function formatFileSize(bytes: number): string {
 }
 
 // Helper function to validate file type
+const ALL_ALLOWED_MIME_TYPES: readonly string[] = [
+  ...ALLOWED_FILE_TYPES.image,
+  ...ALLOWED_FILE_TYPES.pdf,
+  ...ALLOWED_FILE_TYPES.font,
+];
+
 export function isValidFileType(mimeType: string): boolean {
-  const allAllowedTypes = [
-    ...ALLOWED_FILE_TYPES.image,
-    ...ALLOWED_FILE_TYPES.pdf,
-    ...ALLOWED_FILE_TYPES.font,
-  ];
-  return allAllowedTypes.includes(mimeType);
+  if (!mimeType || mimeType.trim() === '') return false;
+  return ALL_ALLOWED_MIME_TYPES.includes(mimeType);
+}
+
+/** Resolve Content-Type for upload: trust browser when valid; otherwise infer from filename (fonts/images often report octet-stream or ""). */
+export function resolveAssetUploadContentType(
+  file: Pick<Blob, 'type'>,
+  fileNameForInference: string
+): string | null {
+  const declared = file.type?.trim() ?? '';
+  if (declared && declared !== 'application/octet-stream' && isValidFileType(declared)) {
+    return declared;
+  }
+  const ext = getFileExtension(fileNameForInference);
+  const inferred = ext ? EXTENSION_TO_CANONICAL_MIME[ext] : undefined;
+  if (inferred && isValidFileType(inferred)) {
+    return inferred;
+  }
+  return null;
+}
+
+export function isAllowedAssetUpload(file: Pick<Blob, 'type'>, fileNameForInference: string): boolean {
+  return resolveAssetUploadContentType(file, fileNameForInference) !== null;
 }
 
 // Helper function to get file extension

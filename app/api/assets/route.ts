@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+/** PostgREST `.or()` splits on commas; LIKE treats `%`/`_` as wildcards — normalize for safe filters. */
+function sanitizeAssetSearchInput(raw: string): string {
+  return raw
+    .replace(/,/g, ' ')
+    .replace(/%/g, '')
+    .replace(/_/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -23,14 +33,14 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const folder = searchParams.get('folder');
     const search = searchParams.get('search');
-    const page = parseInt(searchParams.get('page') || '1');
-    const page_size = parseInt(searchParams.get('page_size') || '50');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const page_size = Math.min(
+      100,
+      Math.max(1, parseInt(searchParams.get('page_size') || '50', 10) || 50)
+    );
 
-    // 3. Build query
-    let query = supabase
-      .from('assets')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false });
+    // 3. Build query (no aggregate count — avoids PostgREST/RLS issues; UI lists current page only)
+    let query = supabase.from('assets').select('*').order('created_at', { ascending: false });
 
     // Apply filters
     if (workspace_id) {
@@ -53,8 +63,9 @@ export async function GET(request: NextRequest) {
       query = query.eq('folder', folder);
     }
 
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+    const searchClean = search ? sanitizeAssetSearchInput(search) : '';
+    if (searchClean) {
+      query = query.or(`name.ilike.%${searchClean}%,description.ilike.%${searchClean}%`);
     }
 
     // Apply pagination
@@ -63,31 +74,41 @@ export async function GET(request: NextRequest) {
     query = query.range(from, to);
 
     // 4. Execute query (RLS policies handle access control)
-    const { data: assets, error, count } = await query;
+    const { data: assets, error } = await query;
 
     if (error) {
       console.error('Assets query error:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch assets' },
+        {
+          error: 'Failed to fetch assets',
+          details: error.message,
+          code: error.code,
+        },
         { status: 500 }
       );
     }
+
+    const len = assets?.length ?? 0;
+    const has_more = len === page_size;
 
     // 5. Return response
     return NextResponse.json(
       {
         assets: assets || [],
-        total: count || 0,
+        total: len,
         page,
         page_size,
-        has_more: count ? count > page * page_size : false,
+        has_more,
       },
       { status: 200 }
     );
   } catch (error) {
     console.error('Assets GET error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
