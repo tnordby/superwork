@@ -94,11 +94,18 @@ export default function PlanPage() {
           setProjectCosts({ usedBalance, committedBalance });
         }
       } else {
+        const metadata = user.user_metadata || {};
+        const companyName =
+          typeof metadata.company_name === 'string' ? metadata.company_name.trim() : '';
+        const fullName = typeof metadata.full_name === 'string' ? metadata.full_name.trim() : '';
+        const emailLocal = user.email ? user.email.split('@')[0] : 'Customer';
+        const workspaceName = companyName || fullName || emailLocal;
+
         // Create a workspace for the user
         const { data: newWorkspace } = await supabase
           .from('workspaces')
           .insert({
-            name: `${user.email}'s Workspace`,
+            name: workspaceName,
             owner_id: user.id,
             type: 'client',
           })

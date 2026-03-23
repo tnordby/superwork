@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { loadCustomersOverview } from '@/lib/team/customers-overview';
+import { WorkspaceContractsPanel } from './WorkspaceContractsPanel';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -59,6 +60,8 @@ export default async function CustomerWorkspacePage({
           <p className="mt-2 text-base font-semibold text-gray-900">{formatCurrency(customer.arr)}</p>
         </div>
       </div>
+
+      <WorkspaceContractsPanel workspaceId={customer.id} />
     </div>
   );
 }

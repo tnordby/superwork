@@ -30,7 +30,6 @@ import {
   Shield,
   Zap,
   ClipboardList,
-  Repeat2,
 } from 'lucide-react';
 import { normalizePlatformRole, isAdmin as isAdminRole, isQuoteManager } from '@/lib/auth/platform-role';
 
@@ -44,6 +43,11 @@ interface ExpandableNavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   subItems: NavItem[];
+}
+
+interface ClientSwitcherOption {
+  id: string;
+  name: string;
 }
 
 const bottomNavigationItems: NavItem[] = [
@@ -94,30 +98,45 @@ export function Sidebar() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Projects', 'Account', 'Workspace']));
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { signOut, user, platformRole } = useAuth();
-  const [selectedClientId, setSelectedClientId] = useState('acme');
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [clientSwitcherOptions, setClientSwitcherOptions] = useState<ClientSwitcherOption[]>([]);
 
   const effectiveRole = platformRole ?? normalizePlatformRole(user?.user_metadata?.role);
   const useInternalShell = effectiveRole !== 'customer';
   const canSwitchClient = useInternalShell;
 
-  const clientSwitcherOptions = useMemo(
-    () => [
-      { id: 'acme', name: 'Acme Labs' },
-      { id: 'northstar', name: 'Northstar Health' },
-      { id: 'brightpath', name: 'BrightPath SaaS' },
-      { id: 'summit', name: 'Summit Retail Group' },
-      { id: 'evergreen', name: 'Evergreen Logistics' },
-    ],
-    []
-  );
-
   useEffect(() => {
     if (!canSwitchClient) return;
-    const stored = window.localStorage.getItem('internal_selected_client_id');
+    let mounted = true;
+    const loadCustomers = async () => {
+      try {
+        const response = await fetch('/api/internal/customer-workspaces', { credentials: 'include' });
+        const data = await response.json();
+        if (!response.ok || !mounted) return;
+        const customers = Array.isArray(data.customers) ? data.customers : [];
+        setClientSwitcherOptions(customers);
+      } catch {
+        if (mounted) setClientSwitcherOptions([]);
+      }
+    };
+    void loadCustomers();
+    return () => {
+      mounted = false;
+    };
+  }, [canSwitchClient]);
+
+  useEffect(() => {
+    if (!canSwitchClient || clientSwitcherOptions.length === 0) return;
+    const userScopedKey = user?.id
+      ? `internal_selected_client_id:${user.id}`
+      : 'internal_selected_client_id';
+    const stored = window.localStorage.getItem(userScopedKey);
     if (stored && clientSwitcherOptions.some((c) => c.id === stored)) {
       setSelectedClientId(stored);
+      return;
     }
-  }, [canSwitchClient, clientSwitcherOptions]);
+    setSelectedClientId(clientSwitcherOptions[0].id);
+  }, [canSwitchClient, clientSwitcherOptions, user?.id]);
 
   const selectedClientName =
     clientSwitcherOptions.find((c) => c.id === selectedClientId)?.name || 'Select client';
@@ -179,7 +198,14 @@ export function Sidebar() {
     router.refresh();
   };
 
-  const asideClass = useInternalShell ? 'bg-[#1a2332]' : 'bg-[#0e141d]';
+  const internalShellByRole: Record<string, string> = {
+    project_manager: 'bg-[#1f2937]',
+    consultant: 'bg-[#0f2b33]',
+    admin: 'bg-[#2a1f36]',
+  };
+  const asideClass = useInternalShell
+    ? internalShellByRole[effectiveRole] || 'bg-[#1a2332]'
+    : 'bg-[#1a2332]';
 
   return (
     <aside className={`fixed left-0 top-0 z-40 h-screen ${asideClass} transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
@@ -206,11 +232,6 @@ export function Sidebar() {
           ) : (
             <>
               <div className="flex min-w-0 flex-col gap-1">
-                {useInternalShell && (
-                  <span className="w-fit rounded bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#bfe937]">
-                    Team
-                  </span>
-                )}
                 <Image
                   src="/superwork-logo-white.svg"
                   alt="Superwork"
@@ -233,21 +254,20 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {canSwitchClient && !isCollapsed && (
+          {canSwitchClient && !isCollapsed && clientSwitcherOptions.length > 0 && (
             <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                Client View
-              </p>
-              <div className="flex items-center gap-2">
-                <Repeat2 className="h-4 w-4 text-gray-400" />
+              <div className="relative">
                 <select
                   value={selectedClientId}
                   onChange={(e) => {
                     const nextId = e.target.value;
                     setSelectedClientId(nextId);
-                    window.localStorage.setItem('internal_selected_client_id', nextId);
+                    const userScopedKey = user?.id
+                      ? `internal_selected_client_id:${user.id}`
+                      : 'internal_selected_client_id';
+                    window.localStorage.setItem(userScopedKey, nextId);
                   }}
-                  className="w-full rounded-md border border-white/10 bg-[#1f2a3a] px-2 py-1.5 text-xs text-gray-100 focus:outline-none"
+                  className="w-full appearance-none rounded-md border border-white/10 bg-[#1f2a3a] px-2 py-1.5 pr-8 text-xs text-gray-100 focus:outline-none"
                   aria-label="Switch client context"
                 >
                   {clientSwitcherOptions.map((client) => (
@@ -256,16 +276,17 @@ export function Sidebar() {
                     </option>
                   ))}
                 </select>
+                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
               </div>
             </div>
           )}
-          {canSwitchClient && isCollapsed && (
+          {canSwitchClient && isCollapsed && clientSwitcherOptions.length > 0 && (
             <div className="mb-3 flex justify-center">
               <div
                 className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-gray-300"
                 title={`Client: ${selectedClientName}`}
               >
-                <Repeat2 className="h-4 w-4" />
+                {selectedClientName.slice(0, 2).toUpperCase()}
               </div>
             </div>
           )}

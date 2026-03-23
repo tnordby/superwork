@@ -32,6 +32,31 @@ function convertToMonthlyCents(
   return 0;
 }
 
+type WorkspaceContractRow = {
+  workspace_id: string;
+  monthly_amount: number;
+  start_date: string;
+  end_date: string | null;
+  status: string;
+};
+
+function toDateOnly(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+function overlapDaysInclusive(
+  rangeStart: Date,
+  rangeEnd: Date,
+  windowStart: Date,
+  windowEnd: Date
+): number {
+  const start = rangeStart > windowStart ? rangeStart : windowStart;
+  const end = rangeEnd < windowEnd ? rangeEnd : windowEnd;
+  if (start > end) return 0;
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.floor((end.getTime() - start.getTime()) / msPerDay) + 1;
+}
+
 export async function loadCustomersOverview(): Promise<{
   rows: CustomerOverviewRow[];
   usedFallback: boolean;
@@ -87,6 +112,12 @@ export async function loadCustomersOverview(): Promise<{
       db.from('projects').select('id, workspace_id').in('workspace_id', workspaceIds),
       db.from('user_platform_roles').select('user_id, role'),
     ]);
+
+  const { data: contractRows } = await db
+    .from('workspace_contracts')
+    .select('workspace_id, monthly_amount, start_date, end_date, status')
+    .in('workspace_id', workspaceIds)
+    .eq('status', 'active');
 
   const projectIds = (projectRows ?? []).map((p: any) => p.id);
   const projectToWorkspace = new Map((projectRows ?? []).map((p: any) => [p.id, p.workspace_id]));
@@ -194,13 +225,53 @@ export async function loadCustomersOverview(): Promise<{
     }
   }
 
+  const today = toDateOnly(new Date());
+  const futureEnd = toDateOnly(
+    new Date(Date.UTC(today.getUTCFullYear() + 1, today.getUTCMonth(), today.getUTCDate() - 1))
+  );
+  const contractMrrByWorkspace = new Map<string, number>();
+  const contractArrByWorkspace = new Map<string, number>();
+
+  for (const contract of (contractRows ?? []) as WorkspaceContractRow[]) {
+    const workspaceId = contract.workspace_id;
+    const monthlyAmount = Number(contract.monthly_amount || 0);
+    if (!workspaceId || monthlyAmount <= 0) continue;
+
+    const contractStart = toDateOnly(new Date(contract.start_date));
+    const contractEnd = contract.end_date
+      ? toDateOnly(new Date(contract.end_date))
+      : toDateOnly(new Date(Date.UTC(9999, 11, 31)));
+    if (Number.isNaN(contractStart.getTime()) || Number.isNaN(contractEnd.getTime())) continue;
+
+    const activeNow = overlapDaysInclusive(contractStart, contractEnd, today, today) > 0;
+    if (activeNow) {
+      contractMrrByWorkspace.set(
+        workspaceId,
+        (contractMrrByWorkspace.get(workspaceId) ?? 0) + monthlyAmount
+      );
+    }
+
+    const overlapDays = overlapDaysInclusive(contractStart, contractEnd, today, futureEnd);
+    if (overlapDays > 0) {
+      const prorated = monthlyAmount * (overlapDays / 30.4375);
+      contractArrByWorkspace.set(
+        workspaceId,
+        (contractArrByWorkspace.get(workspaceId) ?? 0) + prorated
+      );
+    }
+  }
+
   const rows: CustomerOverviewRow[] = workspaceRows.map((workspace: any) => {
     const stripeMrr =
       workspace.stripe_subscription_status === 'active' && workspace.stripe_price_id
         ? mrrByPriceId.get(workspace.stripe_price_id) ?? 0
         : 0;
     const manualMrr = manualMrrByOwnerId.get(workspace.owner_id) ?? 0;
-    const totalMrr = Math.round((stripeMrr + manualMrr) * 100) / 100;
+    const fallbackMrr = Math.round((stripeMrr + manualMrr) * 100) / 100;
+    const contractMrr = Math.round((contractMrrByWorkspace.get(workspace.id) ?? 0) * 100) / 100;
+    const contractArr = Math.round((contractArrByWorkspace.get(workspace.id) ?? 0) * 100) / 100;
+    const totalMrr = contractMrr > 0 ? contractMrr : fallbackMrr;
+    const totalArr = contractArr > 0 ? contractArr : Math.round(totalMrr * 12 * 100) / 100;
     return {
       id: workspace.id,
       name: workspace.name || ownerNameById.get(workspace.owner_id) || 'Customer',
@@ -208,7 +279,7 @@ export async function loadCustomersOverview(): Promise<{
       projectManager: pmByWorkspaceId.get(workspace.id) || 'Unassigned',
       consultants: Array.from(consultantsByWorkspaceId.get(workspace.id) ?? []),
       mrr: totalMrr,
-      arr: Math.round(totalMrr * 12 * 100) / 100,
+      arr: totalArr,
     };
   });
 
