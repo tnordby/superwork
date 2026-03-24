@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuthenticatedUser } from '@/lib/auth/api';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
-import { hasFullMessagingAccess, isConsultant } from '@/lib/auth/platform-role';
+import { hasFullMessagingAccess, isConsultant, isInternalStaff } from '@/lib/auth/platform-role';
 import type { ConversationSummary } from '@/types/messaging';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
     const projectAssignee = (project.assignee as string | null) ?? null;
     const projectWorkspaceId = (project.workspace_id as string | null) ?? null;
 
-    if (isAdminOrPm && selectedWorkspaceId && projectWorkspaceId !== selectedWorkspaceId) {
+    if (isInternalStaff(platformRole) && selectedWorkspaceId && projectWorkspaceId !== selectedWorkspaceId) {
       return NextResponse.json({ error: 'Project is outside selected client context' }, { status: 403 });
     }
 

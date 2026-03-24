@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff } from '@/lib/auth/platform-role';
-import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
+import {
+  readSelectedWorkspaceIdFromRequest,
+  resolveInternalWriteWorkspaceId,
+} from '@/lib/internal/client-context';
 
 // GET - Fetch all projects for the logged-in user
 export async function GET(request: NextRequest) {
@@ -64,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { name, description, category, service_type, service_template_id } = body;
+    const { name, description, category, service_type, service_template_id, workspace_id } = body;
 
     if (!name || !category || !service_type) {
       return NextResponse.json(
@@ -76,17 +79,28 @@ export async function POST(request: NextRequest) {
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
     const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
-    // Get workspace for project creation.
-    // Internal users create under selected client context; customers under their own workspace.
     let workspaceId: string | null = null;
-    if (isInternalStaff(platformRole) && selectedWorkspaceId) {
+    if (isInternalStaff(platformRole)) {
+      const explicitWorkspaceId =
+        typeof workspace_id === 'string' && workspace_id.trim() ? workspace_id.trim() : null;
+      const resolved = resolveInternalWriteWorkspaceId({
+        platformRole,
+        selectedWorkspaceId,
+        explicitWorkspaceId,
+      });
+      if (resolved.error) {
+        return NextResponse.json({ error: resolved.error }, { status: 400 });
+      }
+      workspaceId = resolved.workspaceId;
       const { data: workspaceInContext } = await supabase
         .from('workspaces')
         .select('id')
-        .eq('id', selectedWorkspaceId)
+        .eq('id', workspaceId)
         .eq('type', 'client')
         .maybeSingle();
-      workspaceId = workspaceInContext?.id ?? null;
+      if (!workspaceInContext) {
+        return NextResponse.json({ error: 'Client workspace not found' }, { status: 400 });
+      }
     } else {
       const { data: workspace } = await supabase
         .from('workspaces')

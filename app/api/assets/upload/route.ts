@@ -7,7 +7,10 @@ import {
 } from '@/types/assets';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff } from '@/lib/auth/platform-role';
-import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
+import {
+  readSelectedWorkspaceIdFromRequest,
+  resolveInternalWriteWorkspaceId,
+} from '@/lib/internal/client-context';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const BUCKET_NAME = 'shared-assets';
@@ -52,8 +55,17 @@ export async function POST(request: NextRequest) {
       typeof workspaceRaw === 'string' && workspaceRaw.trim() !== ''
         ? workspaceRaw.trim()
         : null;
-    const effectiveWorkspaceId =
-      isInternalStaff(platformRole) && selectedWorkspaceId ? selectedWorkspaceId : workspace_id;
+    const writeWorkspaceResolution = resolveInternalWriteWorkspaceId({
+      platformRole,
+      selectedWorkspaceId,
+      explicitWorkspaceId: workspace_id,
+    });
+    if (writeWorkspaceResolution.error) {
+      return NextResponse.json({ error: writeWorkspaceResolution.error }, { status: 400 });
+    }
+    const effectiveWorkspaceId = isInternalStaff(platformRole)
+      ? writeWorkspaceResolution.workspaceId
+      : workspace_id;
     const project_id = formData.get('project_id') as string | null;
     const category = formData.get('category') as string | null;
     const folder = formData.get('folder') as string | null;

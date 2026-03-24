@@ -54,3 +54,33 @@ export async function resolveSelectedWorkspaceForRole(
 
   return { workspaceId: options[0].id, options };
 }
+
+export function resolveInternalWriteWorkspaceId(params: {
+  platformRole: PlatformRole;
+  selectedWorkspaceId: string | null;
+  explicitWorkspaceId?: string | null;
+}): { workspaceId: string | null; error: string | null } {
+  const { platformRole, selectedWorkspaceId, explicitWorkspaceId } = params;
+  if (!isInternalStaff(platformRole)) {
+    return { workspaceId: explicitWorkspaceId ?? null, error: null };
+  }
+
+  if (selectedWorkspaceId) {
+    if (explicitWorkspaceId && explicitWorkspaceId !== selectedWorkspaceId) {
+      return {
+        workspaceId: null,
+        error: 'Provided workspace does not match selected client context',
+      };
+    }
+    return { workspaceId: selectedWorkspaceId, error: null };
+  }
+
+  if (explicitWorkspaceId) {
+    return { workspaceId: explicitWorkspaceId, error: null };
+  }
+
+  return {
+    workspaceId: null,
+    error: 'Select a client context or provide workspace_id when using All clients',
+  };
+}

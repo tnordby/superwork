@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
-import { isQuoteManager } from '@/lib/auth/platform-role';
+import { isInternalStaff, isQuoteManager } from '@/lib/auth/platform-role';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 // GET - List quotes (filtered by role)
@@ -90,6 +90,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
     // Validate required fields
     if (!body.title || !body.category || !body.service_type) {
@@ -103,12 +105,25 @@ export async function POST(request: NextRequest) {
     if (body.project_id) {
       const { data: projectForClientInfo } = await supabase
         .from('projects')
-        .select('user_id')
+        .select('user_id, workspace_id')
         .eq('id', body.project_id)
         .maybeSingle();
+      if (isInternalStaff(platformRole) && selectedWorkspaceId) {
+        if (!projectForClientInfo || projectForClientInfo.workspace_id !== selectedWorkspaceId) {
+          return NextResponse.json(
+            { error: 'Project is outside selected client context' },
+            { status: 403 }
+          );
+        }
+      }
       if (projectForClientInfo?.user_id) {
         projectOwnerId = projectForClientInfo.user_id;
       }
+    } else if (isInternalStaff(platformRole)) {
+      return NextResponse.json(
+        { error: 'Internal quote creation requires project_id for tenant-safe context' },
+        { status: 400 }
+      );
     }
 
     const { data: profile } = await supabase
