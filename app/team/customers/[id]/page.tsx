@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { loadCustomersOverview } from '@/lib/team/customers-overview';
+import { loadCustomersOverviewForWorkspace } from '@/lib/team/customers-overview';
+import { readSelectedWorkspaceIdFromServerCookies } from '@/lib/internal/client-context';
 import { WorkspaceContractsPanel } from './WorkspaceContractsPanel';
 
 function formatCurrency(value: number): string {
@@ -17,7 +18,8 @@ export default async function CustomerWorkspacePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { rows } = await loadCustomersOverview();
+  const selectedWorkspaceId = await readSelectedWorkspaceIdFromServerCookies();
+  const { rows } = await loadCustomersOverviewForWorkspace(selectedWorkspaceId);
   const customer = rows.find((c) => c.id === id);
 
   if (!customer) {

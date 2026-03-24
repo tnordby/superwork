@@ -50,6 +50,8 @@ interface ClientSwitcherOption {
   name: string;
 }
 
+const ALL_CLIENTS_OPTION: ClientSwitcherOption = { id: '__all__', name: 'All clients' };
+
 const bottomNavigationItems: NavItem[] = [
   {
     label: 'Submit feedback',
@@ -113,7 +115,8 @@ export function Sidebar() {
         const response = await fetch('/api/internal/selected-workspace', { credentials: 'include' });
         const data = await response.json();
         if (!response.ok || !mounted) return;
-        const customers = Array.isArray(data.options) ? data.options : [];
+        const rawCustomers = Array.isArray(data.options) ? data.options : [];
+        const customers = [ALL_CLIENTS_OPTION, ...rawCustomers];
         setClientSwitcherOptions(customers);
         const userScopedKey = user?.id
           ? `internal_selected_client_id:${user.id}`
@@ -127,9 +130,7 @@ export function Sidebar() {
           setSelectedClientId(data.workspace_id);
           return;
         }
-        if (customers[0]?.id) {
-          setSelectedClientId(customers[0].id);
-        }
+        setSelectedClientId('__all__');
       } catch {
         if (mounted) setClientSwitcherOptions([]);
       }
@@ -272,7 +273,7 @@ export function Sidebar() {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       credentials: 'include',
-                      body: JSON.stringify({ workspace_id: nextId }),
+                      body: JSON.stringify({ workspace_id: nextId === '__all__' ? null : nextId }),
                     });
                     router.refresh();
                   }}

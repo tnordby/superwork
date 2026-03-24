@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/admin';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff } from '@/lib/auth/platform-role';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 type ContractPayload = {
   billing_source?: 'stripe' | 'manual';
@@ -37,6 +38,10 @@ export async function GET(
     const role = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
     if (!isInternalStaff(role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    if (selectedWorkspaceId && selectedWorkspaceId !== id) {
+      return NextResponse.json({ error: 'Workspace is outside selected client context' }, { status: 403 });
     }
 
     let db: ReturnType<typeof createServiceRoleClient> | typeof supabase;
@@ -94,6 +99,10 @@ export async function POST(
     const role = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
     if (!canManageContracts(role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    if (selectedWorkspaceId && selectedWorkspaceId !== id) {
+      return NextResponse.json({ error: 'Workspace is outside selected client context' }, { status: 403 });
     }
 
     const body = (await request.json()) as ContractPayload;

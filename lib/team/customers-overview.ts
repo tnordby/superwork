@@ -61,6 +61,15 @@ export async function loadCustomersOverview(): Promise<{
   rows: CustomerOverviewRow[];
   usedFallback: boolean;
 }> {
+  return loadCustomersOverviewForWorkspace();
+}
+
+export async function loadCustomersOverviewForWorkspace(
+  workspaceIdFilter?: string | null
+): Promise<{
+  rows: CustomerOverviewRow[];
+  usedFallback: boolean;
+}> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -84,13 +93,17 @@ export async function loadCustomersOverview(): Promise<{
     usedFallback = true;
   }
 
-  const { data: workspaces, error: wsError } = await db
+  let workspacesQuery = db
     .from('workspaces')
     .select(
       'id, name, owner_id, type, stripe_price_id, stripe_subscription_status, stripe_subscription_id'
     )
     .eq('type', 'client')
     .order('created_at', { ascending: false });
+  if (workspaceIdFilter) {
+    workspacesQuery = workspacesQuery.eq('id', workspaceIdFilter);
+  }
+  const { data: workspaces, error: wsError } = await workspacesQuery;
   if (wsError) throw new Error(wsError.message);
 
   const workspaceRows = workspaces ?? [];

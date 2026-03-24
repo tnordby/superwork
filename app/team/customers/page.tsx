@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { BadgeCheck, CircleOff, Users } from 'lucide-react';
-import { loadCustomersOverview } from '@/lib/team/customers-overview';
+import { loadCustomersOverviewForWorkspace } from '@/lib/team/customers-overview';
+import { readSelectedWorkspaceIdFromServerCookies } from '@/lib/internal/client-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,9 @@ function formatCurrency(value: number): string {
 }
 
 export default async function TeamCustomersPage() {
-  const { rows } = await loadCustomersOverview();
+  const selectedWorkspaceId = await readSelectedWorkspaceIdFromServerCookies();
+  const { rows } = await loadCustomersOverviewForWorkspace(selectedWorkspaceId);
+  const selectedCustomer = selectedWorkspaceId ? rows[0] : null;
 
   return (
     <div className="p-8 space-y-6">
@@ -22,6 +25,11 @@ export default async function TeamCustomersPage() {
         <p className="mt-1 text-sm text-gray-600">
           Internal overview of active and inactive customers with assigned PM and consultants.
         </p>
+        {selectedCustomer && (
+          <div className="mt-3 inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700">
+            Viewing: {selectedCustomer.name}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

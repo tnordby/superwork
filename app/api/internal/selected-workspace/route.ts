@@ -23,6 +23,10 @@ function setWorkspaceCookie(response: NextResponse, workspaceId: string) {
   });
 }
 
+function clearWorkspaceCookie(response: NextResponse) {
+  response.cookies.delete(INTERNAL_SELECTED_WORKSPACE_COOKIE);
+}
+
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -77,10 +81,17 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const requestedWorkspaceId =
-    typeof body.workspace_id === 'string' && body.workspace_id.trim() ? body.workspace_id.trim() : null;
-  if (!requestedWorkspaceId) {
-    return NextResponse.json({ error: 'workspace_id is required' }, { status: 400 });
+  const requestedWorkspaceId = typeof body.workspace_id === 'string' ? body.workspace_id.trim() : '';
+  if (!requestedWorkspaceId || requestedWorkspaceId === '__all__') {
+    const response = NextResponse.json(
+      {
+        workspace_id: null,
+        workspace_name: null,
+      },
+      { status: 200 }
+    );
+    clearWorkspaceCookie(response);
+    return response;
   }
 
   let db = supabase;
