@@ -1,0 +1,56 @@
+import type { NextRequest } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
+import type { PlatformRole } from '@/lib/auth/platform-role';
+import { isInternalStaff } from '@/lib/auth/platform-role';
+
+export const INTERNAL_SELECTED_WORKSPACE_COOKIE = 'internal_selected_workspace_id';
+
+export function readSelectedWorkspaceIdFromRequest(request: NextRequest): string | null {
+  const value = request.cookies.get(INTERNAL_SELECTED_WORKSPACE_COOKIE)?.value?.trim();
+  return value || null;
+}
+
+export async function readSelectedWorkspaceIdFromServerCookies(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const value = cookieStore.get(INTERNAL_SELECTED_WORKSPACE_COOKIE)?.value?.trim();
+  return value || null;
+}
+
+export async function loadInternalWorkspaceOptions(db: SupabaseClient): Promise<
+  Array<{ id: string; name: string }>
+> {
+  const { data, error } = await db
+    .from('workspaces')
+    .select('id, name')
+    .eq('type', 'client')
+    .order('name', { ascending: true });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return (data || []).map((workspace: { id: string; name: string | null }) => ({
+    id: workspace.id,
+    name: workspace.name || 'Customer',
+  }));
+}
+
+export async function resolveSelectedWorkspaceForRole(
+  db: SupabaseClient,
+  platformRole: PlatformRole,
+  requestedWorkspaceId: string | null
+): Promise<{ workspaceId: string | null; options: Array<{ id: string; name: string }> }> {
+  if (!isInternalStaff(platformRole)) {
+    return { workspaceId: null, options: [] };
+  }
+
+  const options = await loadInternalWorkspaceOptions(db);
+  if (options.length === 0) {
+    return { workspaceId: null, options };
+  }
+
+  if (requestedWorkspaceId && options.some((option) => option.id === requestedWorkspaceId)) {
+    return { workspaceId: requestedWorkspaceId, options };
+  }
+
+  return { workspaceId: options[0].id, options };
+}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isQuoteManager } from '@/lib/auth/platform-role';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 // GET - List quotes (filtered by role)
 export async function GET(request: NextRequest) {
@@ -19,13 +20,24 @@ export async function GET(request: NextRequest) {
     }
 
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
     let query = supabase
       .from('quotes')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!isQuoteManager(platformRole)) {
+    if (isQuoteManager(platformRole) && selectedWorkspaceId) {
+      const { data: workspaceProjects, error: workspaceProjectsError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('workspace_id', selectedWorkspaceId);
+      if (workspaceProjectsError) {
+        return NextResponse.json({ error: workspaceProjectsError.message }, { status: 500 });
+      }
+      const projectIds = (workspaceProjects || []).map((project: { id: string }) => project.id);
+      query = query.in('project_id', projectIds);
+    } else if (!isQuoteManager(platformRole)) {
       query = query.eq('user_id', user.id);
     }
 
@@ -36,7 +48,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const safeQuotes = (quotes || []).map((q: any) => {
+    const safeQuotes = (quotes || []).map((q: Record<string, unknown>) => {
       if (isQuoteManager(platformRole)) return q;
       const customerQuote = { ...q };
       delete customerQuote.adjusted_hours;

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isQuoteManager } from '@/lib/auth/platform-role';
+import { readSelectedWorkspaceIdFromServerCookies } from '@/lib/internal/client-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,10 +32,37 @@ export default async function TeamQuotesPage() {
     redirect('/team');
   }
 
-  const { data: quotes, error } = await supabase
+  const selectedWorkspaceId = await readSelectedWorkspaceIdFromServerCookies();
+  let selectedWorkspaceName: string | null = null;
+  if (selectedWorkspaceId) {
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('name')
+      .eq('id', selectedWorkspaceId)
+      .maybeSingle();
+    selectedWorkspaceName = workspace?.name || null;
+  }
+  let quoteProjectIds: string[] | null = null;
+  if (selectedWorkspaceId) {
+    const { data: workspaceProjects } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('workspace_id', selectedWorkspaceId);
+    quoteProjectIds = (workspaceProjects || []).map((row: { id: string }) => row.id);
+  }
+
+  if (quoteProjectIds && quoteProjectIds.length === 0) {
+    quoteProjectIds = ['00000000-0000-0000-0000-000000000000'];
+  }
+
+  let quotesQuery = supabase
     .from('quotes')
     .select('id, title, status, category, service_type, final_price, estimated_price, currency, created_at, reviewed_at, user_id')
     .order('created_at', { ascending: false });
+  if (quoteProjectIds) {
+    quotesQuery = quotesQuery.in('project_id', quoteProjectIds);
+  }
+  const { data: quotes, error } = await quotesQuery;
 
   if (error) {
     return (
@@ -50,6 +78,11 @@ export default async function TeamQuotesPage() {
         <div>
           <h1 className="text-3xl font-semibold text-gray-900">Quotes</h1>
           <p className="mt-1 text-sm text-gray-600">Review pricing and send quotes to customers for approval.</p>
+          {selectedWorkspaceName && (
+            <div className="mt-2 inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700">
+              Viewing: {selectedWorkspaceName}
+            </div>
+          )}
         </div>
         <Link href="/team" className="text-sm font-medium text-gray-600 hover:text-gray-900">
           ← Team home

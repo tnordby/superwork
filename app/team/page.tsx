@@ -3,6 +3,7 @@ import { Inbox, Briefcase, ClipboardList } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isQuoteManager } from '@/lib/auth/platform-role';
+import { readSelectedWorkspaceIdFromServerCookies } from '@/lib/internal/client-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,16 @@ export default async function TeamHomePage() {
   const role = user
     ? await resolvePlatformRole(supabase, user.id, user.user_metadata?.role)
     : null;
+  const selectedWorkspaceId = await readSelectedWorkspaceIdFromServerCookies();
+  let selectedWorkspaceName: string | null = null;
+  if (selectedWorkspaceId) {
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('name')
+      .eq('id', selectedWorkspaceId)
+      .maybeSingle();
+    selectedWorkspaceName = workspace?.name || null;
+  }
 
   return (
     <div className="p-8">
@@ -22,6 +33,11 @@ export default async function TeamHomePage() {
         Internal hub for consultants and project managers. Customer billing and subscription views stay under Account
         in the sidebar when you need them.
       </p>
+      {selectedWorkspaceName && (
+        <div className="mt-4 inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700">
+          Viewing: {selectedWorkspaceName}
+        </div>
+      )}
 
       <ul className="mt-8 grid max-w-lg gap-3">
         <li>

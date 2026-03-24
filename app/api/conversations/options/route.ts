@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuthenticatedUser } from '@/lib/auth/api';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { hasFullMessagingAccess, isConsultant } from '@/lib/auth/platform-role';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 function getInitialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -12,7 +13,7 @@ function getInitialsFromName(name: string): string {
   return initials || '??';
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { user, errorResponse } = await requireAuthenticatedUser(supabase);
   if (errorResponse) return errorResponse;
@@ -20,6 +21,7 @@ export async function GET() {
   const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
   const isMessagingConsultant = isConsultant(platformRole);
   const isAdminOrPm = hasFullMessagingAccess(platformRole);
+  const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
   try {
     // For now, customer/consultant message threads are project-scoped.
@@ -28,9 +30,13 @@ export async function GET() {
     // Admin/PM can see all projects with assignee.
     let projectsQuery = supabase
       .from('projects')
-      .select('id, name, assignee')
+      .select('id, name, assignee, workspace_id')
       .not('assignee', 'is', null)
       .order('updated_at', { ascending: false });
+
+    if (isAdminOrPm && selectedWorkspaceId) {
+      projectsQuery = projectsQuery.eq('workspace_id', selectedWorkspaceId);
+    }
 
     if (!isAdminOrPm) {
       if (isMessagingConsultant) {

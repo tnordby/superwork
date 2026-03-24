@@ -4,6 +4,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/api';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { hasFullMessagingAccess, isConsultant } from '@/lib/auth/platform-role';
 import type { ConversationSummary } from '@/types/messaging';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 function getInitialsFromName(name: string): string {
   const parts = name
@@ -18,7 +19,7 @@ function getInitialsFromName(name: string): string {
   return initials || '??';
 }
 
-function toConversationSummary(input: any): ConversationSummary {
+function toConversationSummary(input: Record<string, unknown>): ConversationSummary {
   const projectName =
     input.projects?.name ??
     (Array.isArray(input.projects) ? input.projects[0]?.name ?? null : null);
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
   const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
   const isMessagingConsultant = isConsultant(platformRole);
   const isAdminOrPm = hasFullMessagingAccess(platformRole);
+  const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
   const select = `
     id,
@@ -97,6 +99,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (isAdminOrPm && selectedWorkspaceId) {
+      const { data: scopedProjects, error: scopedProjectsError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('workspace_id', selectedWorkspaceId);
+      if (scopedProjectsError) throw scopedProjectsError;
+      const scopedProjectIds = (scopedProjects ?? []).map((project) => project.id).filter(Boolean);
+      query = query.in('project_id', scopedProjectIds);
+    }
+
     const { data, error } = await query.order('last_message_at', { ascending: false });
     if (error) throw error;
 
@@ -114,7 +126,7 @@ export async function GET(request: NextRequest) {
         : typeof e === 'string'
           ? e
           : typeof e === 'object' && e && 'message' in e
-            ? String((e as any).message)
+            ? String((e as { message?: unknown }).message)
             : JSON.stringify(e);
     return NextResponse.json(
       {
@@ -156,12 +168,13 @@ export async function POST(request: NextRequest) {
   const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
   const isMessagingConsultant = isConsultant(platformRole);
   const isAdminOrPm = hasFullMessagingAccess(platformRole);
+  const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
   try {
     // Derive the customer (conversation.user_id) from the project
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, user_id, assignee')
+      .select('id, user_id, assignee, workspace_id')
       .eq('id', projectId)
       .single();
 
@@ -171,6 +184,11 @@ export async function POST(request: NextRequest) {
 
     const customerUserId = project.user_id as string;
     const projectAssignee = (project.assignee as string | null) ?? null;
+    const projectWorkspaceId = (project.workspace_id as string | null) ?? null;
+
+    if (isAdminOrPm && selectedWorkspaceId && projectWorkspaceId !== selectedWorkspaceId) {
+      return NextResponse.json({ error: 'Project is outside selected client context' }, { status: 403 });
+    }
 
     // Access check: customer owns the project, consultant is assigned, or admin/pm
     if (!isAdminOrPm) {
@@ -274,7 +292,7 @@ export async function POST(request: NextRequest) {
         : typeof e === 'string'
           ? e
           : typeof e === 'object' && e && 'message' in e
-            ? String((e as any).message)
+            ? String((e as { message?: unknown }).message)
             : JSON.stringify(e);
     return NextResponse.json(
       {

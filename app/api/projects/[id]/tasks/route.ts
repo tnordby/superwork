@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isInternalStaff } from '@/lib/auth/platform-role';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 // GET - Fetch all tasks for a project
 export async function GET(
@@ -19,14 +22,22 @@ export async function GET(
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
-    // Verify project belongs to user
-    const { data: project, error: projectError } = await supabase
+    // Verify project is accessible in current context
+    let projectQuery = supabase
       .from('projects')
       .select('id')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single();
+      .eq('id', id);
+    if (isInternalStaff(platformRole)) {
+      if (selectedWorkspaceId) {
+        projectQuery = projectQuery.eq('workspace_id', selectedWorkspaceId);
+      }
+    } else {
+      projectQuery = projectQuery.eq('user_id', user.id);
+    }
+    const { data: project, error: projectError } = await projectQuery.single();
 
     if (projectError || !project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });

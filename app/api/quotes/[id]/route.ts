@@ -8,6 +8,7 @@ import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isQuoteManager } from '@/lib/auth/platform-role';
 import { validateQuoteAssignee } from '@/lib/auth/quote-assignee';
 import { computeValuePricing, roundUpToNearestThousand } from '@/lib/quotes/value-pricing';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 const QUOTE_OPTIONAL_PRICING_COLUMNS = new Set([
   'estimated_hours_low',
@@ -57,8 +58,19 @@ export async function GET(
     }
 
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
     if (!isQuoteManager(platformRole) && quote.user_id !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+    if (isQuoteManager(platformRole) && selectedWorkspaceId) {
+      const { data: quoteProject } = await supabase
+        .from('projects')
+        .select('workspace_id')
+        .eq('id', quote.project_id)
+        .maybeSingle();
+      if (!quoteProject || quoteProject.workspace_id !== selectedWorkspaceId) {
+        return NextResponse.json({ error: 'Quote is outside selected client context' }, { status: 403 });
+      }
     }
 
     // Fetch line items
@@ -200,6 +212,17 @@ export async function PATCH(
     }
 
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    if (isQuoteManager(platformRole) && selectedWorkspaceId) {
+      const { data: quoteProject } = await supabase
+        .from('projects')
+        .select('workspace_id')
+        .eq('id', existingQuote.project_id)
+        .maybeSingle();
+      if (!quoteProject || quoteProject.workspace_id !== selectedWorkspaceId) {
+        return NextResponse.json({ error: 'Quote is outside selected client context' }, { status: 403 });
+      }
+    }
 
     // Build update object based on permissions and status
     const updateData: any = {};
@@ -496,8 +519,19 @@ export async function DELETE(
     }
 
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
     if (!isQuoteManager(platformRole) && quote.user_id !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+    if (isQuoteManager(platformRole) && selectedWorkspaceId) {
+      const { data: quoteProject } = await supabase
+        .from('projects')
+        .select('workspace_id')
+        .eq('id', quote.project_id)
+        .maybeSingle();
+      if (!quoteProject || quoteProject.workspace_id !== selectedWorkspaceId) {
+        return NextResponse.json({ error: 'Quote is outside selected client context' }, { status: 403 });
+      }
     }
 
     const { error } = await supabase.from('quotes').delete().eq('id', id);

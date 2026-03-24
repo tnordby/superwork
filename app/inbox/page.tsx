@@ -33,6 +33,7 @@ export default function InboxPage() {
   const [selectedContactForNew, setSelectedContactForNew] = useState<string>('');
   const [extraParticipantsInput, setExtraParticipantsInput] = useState('');
   const [showExtraParticipants, setShowExtraParticipants] = useState(false);
+  const [viewingClientName, setViewingClientName] = useState<string | null>(null);
 
   const selectedConv = useMemo(() => {
     if (!selectedConversationId) return null;
@@ -58,6 +59,23 @@ export default function InboxPage() {
     if (participants.length === 1) return participants[0];
     return `${participants[0]} +${participants.length - 1}`;
   };
+
+  useEffect(() => {
+    async function loadContext() {
+      if (authLoading || !user) return;
+      try {
+        const response = await fetch('/api/internal/selected-workspace', { credentials: 'include' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (typeof data.workspace_name === 'string' && data.workspace_name) {
+          setViewingClientName(data.workspace_name);
+        }
+      } catch {
+        // no-op
+      }
+    }
+    void loadContext();
+  }, [authLoading, user]);
 
   useEffect(() => {
     async function loadOptions() {
@@ -251,6 +269,11 @@ export default function InboxPage() {
         <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
           <div className="p-6 border-b border-gray-200">
             <h1 className="text-2xl font-semibold text-gray-900">Inbox</h1>
+            {viewingClientName && (
+              <div className="mt-2 inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+                Viewing: {viewingClientName}
+              </div>
+            )}
 
             <div className="mt-4 rounded-2xl border border-gray-200 p-4">
               <p className="text-sm font-semibold text-gray-900">Start a conversation</p>

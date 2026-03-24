@@ -5,6 +5,9 @@ import {
   getFileExtension,
   resolveAssetUploadContentType,
 } from '@/types/assets';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isInternalStaff } from '@/lib/auth/platform-role';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const BUCKET_NAME = 'shared-assets';
@@ -33,6 +36,8 @@ export async function POST(request: NextRequest) {
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
     // 2. Parse form data
     const formData = await request.formData();
@@ -47,6 +52,8 @@ export async function POST(request: NextRequest) {
       typeof workspaceRaw === 'string' && workspaceRaw.trim() !== ''
         ? workspaceRaw.trim()
         : null;
+    const effectiveWorkspaceId =
+      isInternalStaff(platformRole) && selectedWorkspaceId ? selectedWorkspaceId : workspace_id;
     const project_id = formData.get('project_id') as string | null;
     const category = formData.get('category') as string | null;
     const folder = formData.get('folder') as string | null;
@@ -78,18 +85,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Verify workspace access if workspace_id provided
-    if (workspace_id) {
+    if (effectiveWorkspaceId) {
       const { data: memberCheck } = await supabase
         .from('workspace_members')
         .select('id')
-        .eq('workspace_id', workspace_id)
+        .eq('workspace_id', effectiveWorkspaceId)
         .eq('user_id', user.id)
         .maybeSingle();
 
       const { data: ownerCheck } = await supabase
         .from('workspaces')
         .select('id')
-        .eq('id', workspace_id)
+        .eq('id', effectiveWorkspaceId)
         .eq('owner_id', user.id)
         .maybeSingle();
 
@@ -105,8 +112,8 @@ export async function POST(request: NextRequest) {
     const fileExtension = getFileExtension(originalName);
     const uniqueId = crypto.randomUUID();
     const cleanFileName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const storagePath = workspace_id
-      ? `${workspace_id}/${uniqueId}_${cleanFileName}`
+    const storagePath = effectiveWorkspaceId
+      ? `${effectiveWorkspaceId}/${uniqueId}_${cleanFileName}`
       : `${user.id}/${uniqueId}_${cleanFileName}`;
 
     // 6. Upload file to Supabase Storage (ArrayBuffer is reliable in Node route handlers; Content-Type must match bucket allow-list)
@@ -150,11 +157,11 @@ export async function POST(request: NextRequest) {
 
     // 10. Determine uploaded_by_role
     let uploadedByRole = 'client';
-    if (workspace_id) {
+    if (effectiveWorkspaceId) {
       const { data: memberData } = await supabase
         .from('workspace_members')
         .select('role')
-        .eq('workspace_id', workspace_id)
+        .eq('workspace_id', effectiveWorkspaceId)
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -168,7 +175,7 @@ export async function POST(request: NextRequest) {
       .from('assets')
       .insert({
         user_id: user.id,
-        workspace_id: workspace_id || null,
+        workspace_id: effectiveWorkspaceId || null,
         project_id: project_id || null,
         name: originalName,
         file_type: fileType,

@@ -48,6 +48,23 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
   const [serviceTemplates] = useState<ProjectsBrowseServiceRow[]>(initialServiceTemplates);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [viewingClientName, setViewingClientName] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadContext() {
+      try {
+        const response = await fetch('/api/internal/selected-workspace', { credentials: 'include' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (typeof data.workspace_name === 'string' && data.workspace_name) {
+          setViewingClientName(data.workspace_name);
+        }
+      } catch {
+        // no-op
+      }
+    }
+    void loadContext();
+  }, []);
 
   // Fetch user's projects
   useEffect(() => {
@@ -286,6 +303,11 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-gray-900 mb-2">Projects</h1>
         <p className="text-gray-600">Manage your projects and browse available services</p>
+        {viewingClientName && (
+          <div className="mt-3 inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700">
+            Viewing: {viewingClientName}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

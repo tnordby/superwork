@@ -110,11 +110,26 @@ export function Sidebar() {
     let mounted = true;
     const loadCustomers = async () => {
       try {
-        const response = await fetch('/api/internal/customer-workspaces', { credentials: 'include' });
+        const response = await fetch('/api/internal/selected-workspace', { credentials: 'include' });
         const data = await response.json();
         if (!response.ok || !mounted) return;
-        const customers = Array.isArray(data.customers) ? data.customers : [];
+        const customers = Array.isArray(data.options) ? data.options : [];
         setClientSwitcherOptions(customers);
+        const userScopedKey = user?.id
+          ? `internal_selected_client_id:${user.id}`
+          : 'internal_selected_client_id';
+        const stored = window.localStorage.getItem(userScopedKey);
+        if (stored && customers.some((client: ClientSwitcherOption) => client.id === stored)) {
+          setSelectedClientId(stored);
+          return;
+        }
+        if (typeof data.workspace_id === 'string' && data.workspace_id) {
+          setSelectedClientId(data.workspace_id);
+          return;
+        }
+        if (customers[0]?.id) {
+          setSelectedClientId(customers[0].id);
+        }
       } catch {
         if (mounted) setClientSwitcherOptions([]);
       }
@@ -123,20 +138,7 @@ export function Sidebar() {
     return () => {
       mounted = false;
     };
-  }, [canSwitchClient]);
-
-  useEffect(() => {
-    if (!canSwitchClient || clientSwitcherOptions.length === 0) return;
-    const userScopedKey = user?.id
-      ? `internal_selected_client_id:${user.id}`
-      : 'internal_selected_client_id';
-    const stored = window.localStorage.getItem(userScopedKey);
-    if (stored && clientSwitcherOptions.some((c) => c.id === stored)) {
-      setSelectedClientId(stored);
-      return;
-    }
-    setSelectedClientId(clientSwitcherOptions[0].id);
-  }, [canSwitchClient, clientSwitcherOptions, user?.id]);
+  }, [canSwitchClient, user?.id]);
 
   const selectedClientName =
     clientSwitcherOptions.find((c) => c.id === selectedClientId)?.name || 'Select client';
@@ -259,13 +261,20 @@ export function Sidebar() {
               <div className="relative">
                 <select
                   value={selectedClientId}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const nextId = e.target.value;
                     setSelectedClientId(nextId);
                     const userScopedKey = user?.id
                       ? `internal_selected_client_id:${user.id}`
                       : 'internal_selected_client_id';
                     window.localStorage.setItem(userScopedKey, nextId);
+                    await fetch('/api/internal/selected-workspace', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ workspace_id: nextId }),
+                    });
+                    router.refresh();
                   }}
                   className="w-full appearance-none rounded-md border border-white/10 bg-[#1f2a3a] px-2 py-1.5 pr-8 text-xs text-gray-100 focus:outline-none"
                   aria-label="Switch client context"

@@ -17,7 +17,6 @@ import {
   Loader2,
   Mail,
   MessageCircle,
-  DollarSign,
   CalendarClock,
   ChevronDown,
   ChevronRight,
@@ -124,6 +123,23 @@ export default function ProjectDetailPage() {
   const [intakeFormExpanded, setIntakeFormExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [viewingClientName, setViewingClientName] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadContext() {
+      try {
+        const response = await fetch('/api/internal/selected-workspace', { credentials: 'include' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (typeof data.workspace_name === 'string' && data.workspace_name) {
+          setViewingClientName(data.workspace_name);
+        }
+      } catch {
+        // no-op
+      }
+    }
+    void loadContext();
+  }, []);
 
   useEffect(() => {
     async function fetchProjectData() {
@@ -146,8 +162,8 @@ export default function ProjectDetailPage() {
         setProject(projectData.project);
         setMilestones(milestonesData.milestones || []);
         setTasks(tasksData.tasks || []);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch project');
       } finally {
         setLoading(false);
       }
@@ -195,8 +211,9 @@ export default function ProjectDetailPage() {
       }
 
       setProject(data.project);
-    } catch (err: any) {
-      alert(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update status';
+      alert(`Error: ${message}`);
     } finally {
       setUpdating(false);
     }
@@ -234,8 +251,9 @@ export default function ProjectDetailPage() {
       // Redirect to projects list and refresh
       router.push('/projects');
       router.refresh();
-    } catch (err: any) {
-      alert(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete project';
+      alert(`Error: ${message}`);
       setUpdating(false);
       setShowDeleteConfirm(true);
     }
@@ -289,7 +307,6 @@ export default function ProjectDetailPage() {
   const StatusIcon = getStatusIcon(project.status);
   const completedTasks = tasks.filter(t => t.completed).length;
   const totalTasks = tasks.length;
-  const completedMilestones = milestones.filter(m => m.completed).length;
 
   // Group tasks by milestone
   const tasksByMilestone = tasks.reduce((acc, task) => {
@@ -317,6 +334,11 @@ export default function ProjectDetailPage() {
 
         <div className="flex items-start justify-between">
           <div className="flex-1">
+            {viewingClientName && (
+              <div className="mb-3 inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700">
+                Viewing: {viewingClientName}
+              </div>
+            )}
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-3xl font-semibold text-gray-900">{project.name}</h1>
               <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium bg-green-100 text-green-700">

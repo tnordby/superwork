@@ -73,6 +73,7 @@ export default function AssetsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [hoveredAssetId, setHoveredAssetId] = useState<string | null>(null);
+  const [viewingClientName, setViewingClientName] = useState<string | null>(null);
   const dragDepth = useRef(0);
 
   // Load workspaces and assets on mount
@@ -80,6 +81,32 @@ export default function AssetsPage() {
     loadWorkspaces();
     loadAssets();
   }, [selectedWorkspace]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadContext() {
+      try {
+        const response = await fetch('/api/internal/selected-workspace', { credentials: 'include' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!mounted) return;
+        const workspaceId = typeof data.workspace_id === 'string' ? data.workspace_id : '';
+        const workspaceName = typeof data.workspace_name === 'string' ? data.workspace_name : '';
+        if (workspaceId) {
+          setSelectedWorkspace(workspaceId);
+        }
+        if (workspaceName) {
+          setViewingClientName(workspaceName);
+        }
+      } catch {
+        // no-op
+      }
+    }
+    void loadContext();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -319,6 +346,11 @@ export default function AssetsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-gray-900 mb-2">Shared Asset Library</h1>
         <p className="text-gray-600">Central location for brand assets, documents, and shared materials</p>
+        {viewingClientName && (
+          <div className="mt-3 inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700">
+            Viewing: {viewingClientName}
+          </div>
+        )}
       </div>
 
       {/* Workspace Selector */}

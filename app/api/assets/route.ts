@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isInternalStaff } from '@/lib/auth/platform-role';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 /** PostgREST `.or()` splits on commas; LIKE treats `%`/`_` as wildcards — normalize for safe filters. */
 function sanitizeAssetSearchInput(raw: string): string {
@@ -24,6 +27,8 @@ export async function GET(request: NextRequest) {
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
     // 2. Parse query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -43,7 +48,9 @@ export async function GET(request: NextRequest) {
     let query = supabase.from('assets').select('*').order('created_at', { ascending: false });
 
     // Apply filters
-    if (workspace_id) {
+    if (isInternalStaff(platformRole) && selectedWorkspaceId) {
+      query = query.eq('workspace_id', selectedWorkspaceId);
+    } else if (workspace_id) {
       query = query.eq('workspace_id', workspace_id);
     }
 
