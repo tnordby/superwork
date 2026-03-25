@@ -49,7 +49,12 @@ export async function GET(request: NextRequest) {
   }
 
   const requestedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
-  const { workspaceId, options } = await resolveSelectedWorkspaceForRole(db, role, requestedWorkspaceId);
+  const { workspaceId: resolvedWorkspaceId, options } = await resolveSelectedWorkspaceForRole(
+    db,
+    role,
+    requestedWorkspaceId
+  );
+  const workspaceId = requestedWorkspaceId ? resolvedWorkspaceId : null;
   const selected = workspaceId ? options.find((option) => option.id === workspaceId) : null;
 
   const response = NextResponse.json(
@@ -60,9 +65,9 @@ export async function GET(request: NextRequest) {
     },
     { status: 200 }
   );
-  if (workspaceId) {
-    setWorkspaceCookie(response, workspaceId);
-  }
+  // Only set the cookie when one was already present. This prevents "All clients" (cookie cleared)
+  // from being overwritten by an implicit default workspace.
+  if (workspaceId) setWorkspaceCookie(response, workspaceId);
   return response;
 }
 

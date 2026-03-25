@@ -122,15 +122,27 @@ export function Sidebar() {
           ? `internal_selected_client_id:${user.id}`
           : 'internal_selected_client_id';
         const stored = window.localStorage.getItem(userScopedKey);
+        let nextSelectedId: string | null = null;
         if (stored && customers.some((client: ClientSwitcherOption) => client.id === stored)) {
-          setSelectedClientId(stored);
-          return;
+          nextSelectedId = stored;
+        } else if (typeof data.workspace_id === 'string' && data.workspace_id) {
+          nextSelectedId = data.workspace_id;
+        } else {
+          nextSelectedId = rawCustomers[0]?.id ?? '__all__';
         }
-        if (typeof data.workspace_id === 'string' && data.workspace_id) {
-          setSelectedClientId(data.workspace_id);
-          return;
-        }
-        setSelectedClientId('__all__');
+
+        window.localStorage.setItem(userScopedKey, nextSelectedId);
+        setSelectedClientId(nextSelectedId);
+
+        // Persist the selection server-side so internal APIs can scope data.
+        // When "All clients" is selected, we clear the cookie.
+        await fetch('/api/internal/selected-workspace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ workspace_id: nextSelectedId === '__all__' ? null : nextSelectedId }),
+        });
+        router.refresh();
       } catch {
         if (mounted) setClientSwitcherOptions([]);
       }
@@ -139,7 +151,7 @@ export function Sidebar() {
     return () => {
       mounted = false;
     };
-  }, [canSwitchClient, user?.id]);
+  }, [canSwitchClient, user?.id, router]);
 
   const selectedClientName =
     clientSwitcherOptions.find((c) => c.id === selectedClientId)?.name || 'Select client';
