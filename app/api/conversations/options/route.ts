@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuthenticatedUser } from '@/lib/auth/api';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
-import { hasFullMessagingAccess, isConsultant } from '@/lib/auth/platform-role';
+import { hasFullMessagingAccess, isConsultant, isInternalStaff } from '@/lib/auth/platform-role';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 function getInitialsFromName(name: string): string {
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       .not('assignee', 'is', null)
       .order('updated_at', { ascending: false });
 
-    if (isAdminOrPm && selectedWorkspaceId) {
+    if (isInternalStaff(platformRole) && selectedWorkspaceId) {
       projectsQuery = projectsQuery.eq('workspace_id', selectedWorkspaceId);
     }
 

@@ -36,6 +36,20 @@ export async function GET(
       return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
     }
 
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    if (
+      isInternalStaff(platformRole) &&
+      selectedWorkspaceId &&
+      asset.workspace_id &&
+      asset.workspace_id !== selectedWorkspaceId
+    ) {
+      return NextResponse.json(
+        { error: 'Asset is outside selected client context' },
+        { status: 403 }
+      );
+    }
+
     // 3. Get signed URL for download
     const { data: signedUrlData } = await supabase.storage
       .from(BUCKET_NAME)
