@@ -1,5 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role'
+import { isInternalStaff } from '@/lib/auth/platform-role'
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context'
 
 export async function POST(
   request: NextRequest,
@@ -12,6 +15,20 @@ export async function POST(
 
     const { serviceTemplateId, responses } = body
 
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role)
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request)
+    if (isInternalStaff(platformRole) && !selectedWorkspaceId) {
+      return NextResponse.json(
+        { error: 'Select a client context before updating intake responses.' },
+        { status: 400 }
+      )
+    }
+
     if (!serviceTemplateId || !responses) {
       return NextResponse.json(
         { error: 'serviceTemplateId and responses are required' },
@@ -22,7 +39,7 @@ export async function POST(
     // Verify the project exists and user has access
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, user_id')
+      .select('id, user_id, workspace_id')
       .eq('id', params.id)
       .single()
 
@@ -30,6 +47,13 @@ export async function POST(
       return NextResponse.json(
         { error: 'Project not found' },
         { status: 404 }
+      )
+    }
+
+    if (isInternalStaff(platformRole) && selectedWorkspaceId && project.workspace_id !== selectedWorkspaceId) {
+      return NextResponse.json(
+        { error: 'Project is outside selected client context' },
+        { status: 403 }
       )
     }
 

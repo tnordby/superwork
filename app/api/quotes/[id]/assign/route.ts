@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
-import { isQuoteManager } from '@/lib/auth/platform-role';
+import { isInternalStaff, isQuoteManager } from '@/lib/auth/platform-role';
 import { validateQuoteAssignee } from '@/lib/auth/quote-assignee';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 // POST - Assign consultant to quote
 export async function POST(
@@ -26,6 +27,13 @@ export async function POST(
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
     if (!isQuoteManager(platformRole)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    if (isInternalStaff(platformRole) && !selectedWorkspaceId) {
+      return NextResponse.json(
+        { error: 'Select a client context before assigning quote consultants.' },
+        { status: 400 }
+      );
     }
 
     const body = await request.json();
@@ -51,6 +59,17 @@ export async function POST(
 
     if (quoteError || !quote) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
+    }
+
+    if (isInternalStaff(platformRole) && selectedWorkspaceId) {
+      const { data: project } = await supabase
+        .from('projects')
+        .select('workspace_id')
+        .eq('id', quote.project_id)
+        .maybeSingle();
+      if (!project || project.workspace_id !== selectedWorkspaceId) {
+        return NextResponse.json({ error: 'Quote is outside selected client context' }, { status: 403 });
+      }
     }
 
     // Check if assignment is locked
@@ -108,6 +127,13 @@ export async function DELETE(
     if (!isQuoteManager(platformRole)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    if (isInternalStaff(platformRole) && !selectedWorkspaceId) {
+      return NextResponse.json(
+        { error: 'Select a client context before removing quote assignment.' },
+        { status: 400 }
+      );
+    }
 
     // Fetch quote
     const { data: quote, error: quoteError } = await supabase
@@ -118,6 +144,17 @@ export async function DELETE(
 
     if (quoteError || !quote) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
+    }
+
+    if (isInternalStaff(platformRole) && selectedWorkspaceId) {
+      const { data: project } = await supabase
+        .from('projects')
+        .select('workspace_id')
+        .eq('id', quote.project_id)
+        .maybeSingle();
+      if (!project || project.workspace_id !== selectedWorkspaceId) {
+        return NextResponse.json({ error: 'Quote is outside selected client context' }, { status: 403 });
+      }
     }
 
     // Check if assignment is locked

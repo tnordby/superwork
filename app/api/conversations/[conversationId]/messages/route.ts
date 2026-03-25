@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuthenticatedUser } from '@/lib/auth/api';
 import type { MessageRow } from '@/types/messaging';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isInternalStaff } from '@/lib/auth/platform-role';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
-function getUserDisplayName(user: { user_metadata?: any; email?: string }): string {
+function getUserDisplayName(user: { user_metadata?: Record<string, unknown>; email?: string }): string {
   const first = user.user_metadata?.first_name;
   const last = user.user_metadata?.last_name;
   if (typeof first === 'string' && typeof last === 'string' && first && last) return `${first} ${last}`;
@@ -12,16 +15,16 @@ function getUserDisplayName(user: { user_metadata?: any; email?: string }): stri
   return 'User';
 }
 
-function toMessageRow(input: any): MessageRow {
+function toMessageRow(input: Record<string, unknown>): MessageRow {
   return {
-    id: input.id,
-    conversation_id: input.conversation_id,
-    sender_id: input.sender_id,
-    sender_name: input.sender_name,
-    content: input.content,
-    is_from_user: input.is_from_user,
-    read: input.read,
-    created_at: input.created_at,
+    id: String(input.id ?? ''),
+    conversation_id: String(input.conversation_id ?? ''),
+    sender_id: String(input.sender_id ?? ''),
+    sender_name: String(input.sender_name ?? ''),
+    content: String(input.content ?? ''),
+    is_from_user: Boolean(input.is_from_user),
+    read: Boolean(input.read),
+    created_at: String(input.created_at ?? ''),
   };
 }
 
@@ -75,14 +78,44 @@ export async function POST(
   const trimmed = content.trim().slice(0, 4000);
 
   try {
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    const isInternal = isInternalStaff(platformRole);
+
     const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
-      .select('id, user_id')
+      .select('id, user_id, project_id')
       .eq('id', conversationId)
       .single();
 
     if (conversationError || !conversation) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    }
+
+    if (isInternal) {
+      if (!selectedWorkspaceId) {
+        return NextResponse.json(
+          { error: 'Select a client context before sending messages.' },
+          { status: 400 }
+        );
+      }
+
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .select('workspace_id')
+        .eq('id', conversation.project_id)
+        .single();
+
+      if (projectError || !project || !project.workspace_id) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      }
+
+      if (project.workspace_id !== selectedWorkspaceId) {
+        return NextResponse.json(
+          { error: 'Project is outside selected client context' },
+          { status: 403 }
+        );
+      }
     }
 
     const isFromCustomer = conversation.user_id === user.id;

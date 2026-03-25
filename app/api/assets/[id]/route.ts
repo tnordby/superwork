@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isInternalStaff } from '@/lib/auth/platform-role';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 const BUCKET_NAME = 'shared-assets';
 
@@ -72,9 +75,42 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+
+    if (isInternalStaff(platformRole)) {
+      if (!selectedWorkspaceId) {
+        return NextResponse.json(
+          { error: 'Select a client context before modifying assets.' },
+          { status: 400 }
+        );
+      }
+
+      const { data: assetContext, error: assetContextError } = await supabase
+        .from('assets')
+        .select('id, user_id, workspace_id')
+        .eq('id', id)
+        .single();
+
+      if (assetContextError || !assetContext) {
+        return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
+      }
+
+      if (assetContext.user_id !== user.id) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+      }
+
+      if (assetContext.workspace_id && assetContext.workspace_id !== selectedWorkspaceId) {
+        return NextResponse.json(
+          { error: 'Asset is outside selected client context' },
+          { status: 403 }
+        );
+      }
+    }
+
     // 2. Parse request body
     const body = await request.json();
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     // Allowed fields to update
     if (body.name !== undefined) updateData.name = body.name;
@@ -145,6 +181,9 @@ export async function DELETE(
     }
 
     // 2. Get asset to retrieve storage path
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+
     const { data: asset, error: fetchError } = await supabase
       .from('assets')
       .select('storage_path, user_id, workspace_id')
@@ -153,6 +192,21 @@ export async function DELETE(
 
     if (fetchError || !asset) {
       return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
+    }
+
+    if (isInternalStaff(platformRole)) {
+      if (!selectedWorkspaceId) {
+        return NextResponse.json(
+          { error: 'Select a client context before deleting assets.' },
+          { status: 400 }
+        );
+      }
+      if (asset.workspace_id && asset.workspace_id !== selectedWorkspaceId) {
+        return NextResponse.json(
+          { error: 'Asset is outside selected client context' },
+          { status: 403 }
+        );
+      }
     }
 
     // 3. Check permissions
