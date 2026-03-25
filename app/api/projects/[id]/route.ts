@@ -44,6 +44,12 @@ export async function GET(
     }
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
     const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    if (isInternalStaff(platformRole) && !selectedWorkspaceId) {
+      return NextResponse.json(
+        { error: 'Select a client context before updating projects.' },
+        { status: 400 }
+      );
+    }
 
     // Fetch project
     const { data: project, error } = await loadProjectWithAccessScope(
@@ -89,6 +95,12 @@ export async function PATCH(
     }
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
     const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    if (isInternalStaff(platformRole) && !selectedWorkspaceId) {
+      return NextResponse.json(
+        { error: 'Select a client context before deleting projects.' },
+        { status: 400 }
+      );
+    }
 
     // Parse request body
     const body = await request.json();

@@ -213,6 +213,12 @@ export async function PATCH(
 
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
     const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    if (isQuoteManager(platformRole) && !selectedWorkspaceId) {
+      return NextResponse.json(
+        { error: 'Select a client context before updating quotes.' },
+        { status: 400 }
+      );
+    }
     if (isQuoteManager(platformRole) && selectedWorkspaceId) {
       const { data: quoteProject } = await supabase
         .from('projects')
@@ -520,6 +526,12 @@ export async function DELETE(
 
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
     const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    if (isQuoteManager(platformRole) && !selectedWorkspaceId) {
+      return NextResponse.json(
+        { error: 'Select a client context before deleting quotes.' },
+        { status: 400 }
+      );
+    }
     if (!isQuoteManager(platformRole) && quote.user_id !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
