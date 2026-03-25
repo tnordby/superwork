@@ -123,6 +123,38 @@ export async function GET(
   try {
     const supabase = await createClient()
     const params = await context.params
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role)
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request)
+
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id, user_id, workspace_id')
+      .eq('id', params.id)
+      .single()
+
+    if (projectError || !project) {
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      )
+    }
+
+    if (!isInternalStaff(platformRole) && project.user_id !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (isInternalStaff(platformRole) && selectedWorkspaceId && project.workspace_id !== selectedWorkspaceId) {
+      return NextResponse.json(
+        { error: 'Project is outside selected client context' },
+        { status: 403 }
+      )
+    }
 
     const { data, error } = await supabase
       .from('project_intake_responses')

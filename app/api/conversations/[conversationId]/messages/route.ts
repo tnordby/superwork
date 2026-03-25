@@ -39,6 +39,33 @@ export async function GET(
   const { conversationId } = await params;
 
   try {
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+    const isInternal = isInternalStaff(platformRole);
+
+    if (isInternal && selectedWorkspaceId) {
+      const { data: conversation, error: conversationError } = await supabase
+        .from('conversations')
+        .select('project_id')
+        .eq('id', conversationId)
+        .single();
+      if (conversationError || !conversation) {
+        return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+      }
+
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .select('workspace_id')
+        .eq('id', conversation.project_id)
+        .single();
+      if (projectError || !project || project.workspace_id !== selectedWorkspaceId) {
+        return NextResponse.json(
+          { error: 'Conversation is outside selected client context' },
+          { status: 403 }
+        );
+      }
+    }
+
     const { data: messages, error } = await supabase
       .from('messages')
       .select('id, conversation_id, sender_id, sender_name, content, is_from_user, read, created_at')

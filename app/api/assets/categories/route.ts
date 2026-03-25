@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isInternalStaff } from '@/lib/auth/platform-role';
+import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,10 +17,28 @@ export async function GET(request: NextRequest) {
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
     // 2. Parse query parameters
     const searchParams = request.nextUrl.searchParams;
-    const workspaceId = searchParams.get('workspace_id');
+    const requestedWorkspaceId = searchParams.get('workspace_id');
+    const workspaceId =
+      isInternalStaff(platformRole) && selectedWorkspaceId
+        ? selectedWorkspaceId
+        : requestedWorkspaceId;
+
+    if (
+      isInternalStaff(platformRole) &&
+      selectedWorkspaceId &&
+      requestedWorkspaceId &&
+      requestedWorkspaceId !== selectedWorkspaceId
+    ) {
+      return NextResponse.json(
+        { error: 'Requested workspace is outside selected client context' },
+        { status: 403 }
+      );
+    }
 
     if (!workspaceId) {
       return NextResponse.json({ categories: [] }, { status: 200 });
