@@ -185,16 +185,8 @@ export async function POST(request: NextRequest) {
   const isMessagingConsultant = isConsultant(platformRole);
   const isAdminOrPm = hasFullMessagingAccess(platformRole);
   const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
-  const isInternal = isInternalStaff(platformRole);
 
   try {
-    if (isInternal && !selectedWorkspaceId) {
-      return NextResponse.json(
-        { error: 'Select a client context before creating conversations.' },
-        { status: 400 }
-      );
-    }
-
     // Derive the customer (conversation.user_id) from the project
     const { data: project, error: projectError } = await supabase
       .from('projects')

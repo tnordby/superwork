@@ -48,6 +48,7 @@ export default function PlanPage() {
   const [loading, setLoading] = useState(true);
   const [managingBilling, setManagingBilling] = useState(false);
   const [subscribingToPlan, setSubscribingToPlan] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -162,6 +163,7 @@ export default function PlanPage() {
     if (!workspace?.id) return;
 
     setManagingBilling(true);
+    setPageError(null);
 
     try {
       const response = await fetch('/api/stripe/create-portal-session', {
@@ -185,7 +187,7 @@ export default function PlanPage() {
       }
     } catch (error) {
       console.error('Error creating portal session:', error);
-      alert('Failed to open billing portal. Please try again.');
+      setPageError('Failed to open billing portal. Please try again.');
     } finally {
       setManagingBilling(false);
     }
@@ -193,11 +195,12 @@ export default function PlanPage() {
 
   const handleSubscribe = async (priceId: string) => {
     if (!workspace?.id) {
-      alert('Workspace not found. Please refresh the page.');
+      setPageError('Workspace not found. Please refresh the page.');
       return;
     }
 
     setSubscribingToPlan(priceId);
+    setPageError(null);
 
     try {
       const response = await fetch('/api/stripe/create-checkout-session', {
@@ -224,24 +227,12 @@ export default function PlanPage() {
       }
     } catch (error) {
       console.error('Error creating checkout session:', error);
-      alert(`Failed to start checkout: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setPageError(
+        `Failed to start checkout: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     } finally {
       setSubscribingToPlan(null);
     }
-  };
-
-  const getIntervalLabel = (plan: Plan) => {
-    if (!plan.interval) return '';
-
-    if (plan.interval === 'month') {
-      if (plan.intervalCount === 3) return 'Quarterly';
-      if (plan.intervalCount === 6) return 'Bi-Annual';
-      return 'Monthly';
-    }
-
-    if (plan.interval === 'year') return 'Annual';
-
-    return plan.interval;
   };
 
   const getPlanDetails = (productId: string) => {
@@ -301,10 +292,6 @@ export default function PlanPage() {
     };
   };
 
-  const getPlanFeatures = (metadata: Record<string, string>) => {
-    const featuresString = metadata.features || '';
-    return featuresString.split(',').map(f => f.trim()).filter(Boolean);
-  };
 
   if (loading) {
     return (
@@ -329,6 +316,11 @@ export default function PlanPage() {
   return (
     <div className="p-8">
       <h1 className="text-3xl font-semibold text-gray-900 mb-8">Plan & Billing</h1>
+      {pageError && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {pageError}
+        </div>
+      )}
 
       {/* Subscription Banner */}
       {workspace?.stripe_subscription_status && (

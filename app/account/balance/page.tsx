@@ -87,7 +87,6 @@ export default function BalancePage() {
           }
         } else if (workspaceData.stripe_customer_id) {
           // Auto-sync if they have a customer ID but no subscription ID
-          console.log('No subscription ID found, auto-syncing from Stripe...');
           await syncSubscription();
         }
 

@@ -120,13 +120,6 @@ export async function POST(
     }
 
     if (isInternal) {
-      if (!selectedWorkspaceId) {
-        return NextResponse.json(
-          { error: 'Select a client context before sending messages.' },
-          { status: 400 }
-        );
-      }
-
       const { data: project, error: projectError } = await supabase
         .from('projects')
         .select('workspace_id')
@@ -137,7 +130,7 @@ export async function POST(
         return NextResponse.json({ error: 'Project not found' }, { status: 404 });
       }
 
-      if (project.workspace_id !== selectedWorkspaceId) {
+      if (selectedWorkspaceId && project.workspace_id !== selectedWorkspaceId) {
         return NextResponse.json(
           { error: 'Project is outside selected client context' },
           { status: 403 }

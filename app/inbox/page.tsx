@@ -176,14 +176,17 @@ function InboxPageContent() {
       setLoadingMessages(true);
       try {
         const res = await fetch(`/api/conversations/${selectedConversationId}/messages`);
-        if (!res.ok) throw new Error('Failed to load messages');
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || 'Failed to load messages');
+        }
 
         const data = await res.json();
         const list: MessageRow[] = data.messages ?? [];
         setMessages(list);
       } catch (e) {
         console.error(e);
-        setError('Unable to load messages for this conversation.');
+        setError(e instanceof Error ? e.message : 'Unable to load messages for this conversation.');
       } finally {
         setLoadingMessages(false);
       }
@@ -219,7 +222,7 @@ function InboxPageContent() {
       if (created) setMessages((prev) => [...prev, created]);
     } catch (e) {
       console.error(e);
-      setError('Unable to send message.');
+      setError(e instanceof Error ? e.message : 'Unable to send message.');
     } finally {
       setSending(false);
     }
@@ -264,7 +267,7 @@ function InboxPageContent() {
       }
     } catch (e) {
       console.error(e);
-      setError('Unable to start a new conversation.');
+      setError(e instanceof Error ? e.message : 'Unable to start a new conversation.');
     } finally {
       setCreatingConversation(false);
     }
