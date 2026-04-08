@@ -1,5 +1,6 @@
 import NewInboxMessageEmail from '@/emails/NewInboxMessageEmail';
 import { sendEmail } from '@/lib/email/send';
+import { uniqueEmailsPreservingCase } from '@/lib/messaging/unique-emails';
 import { createServiceRoleClient } from '@/lib/supabase/admin';
 
 function appBaseUrl(): string {
@@ -78,8 +79,10 @@ export async function notifyNewInboxMessage(params: NotifyNewInboxMessageParams)
       recipientEmails = await loadProfileEmails(admin, [params.customerUserId]);
     }
 
-    const deduped = Array.from(new Set(recipientEmails.map((e) => e.toLowerCase())));
-    const filtered = deduped.filter((e) => !senderEmail || e.toLowerCase() !== senderEmail.toLowerCase());
+    const deduped = uniqueEmailsPreservingCase(recipientEmails);
+    const filtered = deduped.filter(
+      (e) => !senderEmail || e.toLowerCase() !== senderEmail.toLowerCase()
+    );
 
     await Promise.all(
       filtered.map((to) =>

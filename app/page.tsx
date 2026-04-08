@@ -35,7 +35,8 @@ type DashboardMessageActivityRow = {
   id: string;
   created_at: string;
   sender_name?: string | null;
-  conversations?: { projects?: { name?: string | null } | { name?: string | null }[] } | null;
+  /** Supabase may return a single object or a one-element array for nested relations. */
+  conversations?: unknown;
 };
 
 type DashboardData = {
@@ -213,10 +214,12 @@ async function loadDashboardData(): Promise<DashboardData> {
       return fallback;
     }
 
-    const projects: DashboardProjectRow[] = (projectRows ?? []).map((project: DashboardProjectDbRow) => ({
+    const rows = (projectRows ?? []) as unknown as DashboardProjectDbRow[];
+    const projects: DashboardProjectRow[] = rows.map((project) => ({
       id: project.id,
-      name: project.name,
-      status: project.status,
+      name: typeof project.name === 'string' && project.name.trim() ? project.name.trim() : 'Project',
+      status:
+        typeof project.status === 'string' && project.status.trim() ? project.status.trim() : 'unknown',
       progress: typeof project.progress === 'number' ? project.progress : 0,
       cost: typeof project.cost === 'number' ? project.cost : 0,
       updated_at: project.updated_at,
@@ -282,12 +285,17 @@ async function loadDashboardData(): Promise<DashboardData> {
     }
 
     const messageActivity = (messageRows ?? []).map((message: DashboardMessageActivityRow) => {
-      const conversation = Array.isArray(message.conversations)
-        ? message.conversations[0]
-        : message.conversations;
-      const projectsField = conversation?.projects;
-      const project = Array.isArray(projectsField) ? projectsField[0] : projectsField;
-      const projectName = project?.name ?? 'Project';
+      const convRaw = message.conversations;
+      const conversation = Array.isArray(convRaw) ? convRaw[0] : convRaw;
+      const conv =
+        conversation && typeof conversation === 'object' && 'projects' in conversation
+          ? (conversation as { projects?: unknown }).projects
+          : undefined;
+      const project = Array.isArray(conv) ? conv[0] : conv;
+      const projectName =
+        project && typeof project === 'object' && project !== null && 'name' in project
+          ? String((project as { name?: unknown }).name ?? 'Project')
+          : 'Project';
       const senderName = message.sender_name ?? 'Team';
 
       return {

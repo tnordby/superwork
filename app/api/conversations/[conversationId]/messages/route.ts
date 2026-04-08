@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuthenticatedUser } from '@/lib/auth/api';
 import type { MessageRow } from '@/types/messaging';
@@ -170,7 +170,7 @@ export async function POST(
       })
       .eq('id', conversationId);
 
-    await notifyNewInboxMessage({
+    const payload = {
       conversationId,
       projectId: String(conversation.project_id),
       customerUserId: String(conversation.user_id),
@@ -178,6 +178,10 @@ export async function POST(
       senderName,
       isFromCustomer,
       preview: trimmed,
+    };
+
+    after(() => {
+      void notifyNewInboxMessage(payload);
     });
 
     return NextResponse.json({ message: toMessageRow(created) }, { status: 201 });
