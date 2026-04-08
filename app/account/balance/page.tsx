@@ -53,26 +53,33 @@ export default function BalancePage() {
         return;
       }
 
-      // Get user's workspace
-      const { data: workspaceData } = await supabase
+      // Prefer owned workspace, then fallback to membership workspace.
+      let { data: workspaceData } = await supabase
         .from('workspaces')
         .select('*')
         .eq('owner_id', user.id)
         .maybeSingle();
 
+      if (!workspaceData) {
+        const { data: membership } = await supabase
+          .from('workspace_members')
+          .select('workspace_id, workspaces!inner(*)')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+        workspaceData = (membership?.workspaces as Workspace | Workspace[] | null) || null;
+        if (Array.isArray(workspaceData)) workspaceData = workspaceData[0] || null;
+      }
+
       if (workspaceData) {
         setWorkspace(workspaceData);
-        console.log('Workspace data:', workspaceData);
 
         // Fetch subscription details from Stripe if they have an active subscription
         if (workspaceData.stripe_subscription_id) {
-          console.log('Fetching subscription:', workspaceData.stripe_subscription_id);
           const response = await fetch(`/api/stripe/subscription?subscriptionId=${workspaceData.stripe_subscription_id}`);
-          console.log('Subscription API response status:', response.status);
 
           if (response.ok) {
             const data = await response.json();
-            console.log('Subscription data:', data);
             setSubscriptionData(data);
           } else {
             const error = await response.json();
@@ -114,8 +121,6 @@ export default function BalancePage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        console.log('Subscription synced:', data);
         // Reload the page to fetch updated data
         window.location.reload();
       } else {
@@ -140,6 +145,8 @@ export default function BalancePage() {
     );
   }
 
+  const hasActiveSubscription = Boolean(workspace?.stripe_subscription_id && startingBalance > 0);
+
   return (
     <div className="p-8">
       {/* Header with balance and transfer button */}
@@ -158,13 +165,28 @@ export default function BalancePage() {
               <div className="text-2xl font-semibold text-gray-900">{formatAmount(availableBalance, currency)}</div>
               <div className="text-sm text-gray-500">Available balance</div>
             </div>
-            <button className="flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
+            <button
+              onClick={() => router.push('/account/plan')}
+              className="flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
               <ArrowLeftRight className="h-4 w-4" />
-              Balance transfer
+              Add funds
             </button>
           </div>
         </div>
       </div>
+
+      {!hasActiveSubscription && (
+        <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+          No active billing plan. Add a plan to fund project work.
+          <button
+            onClick={() => router.push('/account/plan')}
+            className="ml-2 font-semibold text-gray-900 underline"
+          >
+            Go to billing
+          </button>
+        </div>
+      )}
 
       {/* Main content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

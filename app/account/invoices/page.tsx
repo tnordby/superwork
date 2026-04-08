@@ -24,7 +24,6 @@ interface Invoice {
 }
 
 export default function InvoicesPage() {
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -43,16 +42,25 @@ export default function InvoicesPage() {
         return;
       }
 
-      // Get user's workspace
-      const { data: workspaceData } = await supabase
+      // Prefer owned workspace, then fallback to membership workspace.
+      let { data: workspaceData } = await supabase
         .from('workspaces')
         .select('*')
         .eq('owner_id', user.id)
         .maybeSingle();
 
-      if (workspaceData) {
-        setWorkspace(workspaceData);
+      if (!workspaceData) {
+        const { data: membership } = await supabase
+          .from('workspace_members')
+          .select('workspace_id, workspaces!inner(*)')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+        workspaceData = (membership?.workspaces as Workspace | Workspace[] | null) || null;
+        if (Array.isArray(workspaceData)) workspaceData = workspaceData[0] || null;
+      }
 
+      if (workspaceData) {
         // Fetch billing data if workspace has stripe customer
         if (workspaceData.stripe_customer_id) {
           const response = await fetch(`/api/billing/workspace?workspaceId=${workspaceData.id}`);
@@ -151,6 +159,12 @@ export default function InvoicesPage() {
       ) : (
         <div className="rounded-2xl border border-gray-200 bg-gray-50 p-12 text-center">
           <p className="text-gray-600">No invoices yet. Invoices will appear here after your first payment.</p>
+          <button
+            onClick={() => router.push('/account/plan')}
+            className="mt-4 rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+          >
+            Add billing plan
+          </button>
         </div>
       )}
     </div>

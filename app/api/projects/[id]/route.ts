@@ -5,6 +5,7 @@ import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff } from '@/lib/auth/platform-role';
 import type { PlatformRole } from '@/lib/auth/platform-role';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
+import { getWorkspaceBudgetSnapshot } from '@/lib/billing/workspace-budget';
 
 async function loadProjectWithAccessScope(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -134,6 +135,26 @@ export async function PATCH(
     );
     if (existingProjectError || !existingProject) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    }
+
+    const STARTED_STATUSES = new Set(['in_progress', 'in_review', 'on_hold', 'completed']);
+    const previousStatus = existingProject.status as string;
+    const nextStatus = (updateData.status ?? previousStatus) as string;
+    const projectCostCents = Number(existingProject.cost ?? 0);
+    const transitionsIntoStarted =
+      !STARTED_STATUSES.has(previousStatus) && STARTED_STATUSES.has(nextStatus);
+
+    if (transitionsIntoStarted && projectCostCents > 0 && existingProject.workspace_id) {
+      const budget = await getWorkspaceBudgetSnapshot(supabase, existingProject.workspace_id);
+      if (budget.availableCents < projectCostCents) {
+        return NextResponse.json(
+          {
+            error:
+              'Insufficient available balance to start this project. Add funds or reduce the project budget first.',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Update project

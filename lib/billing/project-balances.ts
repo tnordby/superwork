@@ -7,15 +7,17 @@ export type ProjectCostRow = {
   status: string;
 };
 
+const COMMITTED_STATUSES = new Set(['in_progress', 'in_review', 'on_hold']);
+
 export function sumUsedBalanceCents(projects: ProjectCostRow[]): number {
   return projects
     .filter((p) => p.status === 'completed')
     .reduce((sum, p) => sum + (p.cost ?? 0), 0);
 }
 
-/** Committed budget: agreed / active work not yet completed (includes planned, in progress, etc.). */
+/** Committed budget starts once project work has actually started. */
 export function sumCommittedBalanceCents(projects: ProjectCostRow[]): number {
   return projects
-    .filter((p) => p.status !== 'completed')
+    .filter((p) => COMMITTED_STATUSES.has(p.status))
     .reduce((sum, p) => sum + (p.cost ?? 0), 0);
 }

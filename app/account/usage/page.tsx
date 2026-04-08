@@ -13,12 +13,6 @@ interface Workspace {
   stripe_subscription_id?: string;
 }
 
-interface SubscriptionData {
-  amount: number;
-  currency: string;
-  interval: string;
-}
-
 interface Project {
   id: string;
   name: string;
@@ -41,7 +35,6 @@ interface UsageSummary {
 
 export default function UsagePage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,12 +54,23 @@ export default function UsagePage() {
         return;
       }
 
-      // Get user's workspace
-      const { data: workspaceData } = await supabase
+      // Prefer owned workspace, then fallback to membership workspace.
+      let { data: workspaceData } = await supabase
         .from('workspaces')
         .select('*')
         .eq('owner_id', user.id)
         .maybeSingle();
+
+      if (!workspaceData) {
+        const { data: membership } = await supabase
+          .from('workspace_members')
+          .select('workspace_id, workspaces!inner(*)')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+        workspaceData = (membership?.workspaces as Workspace | Workspace[] | null) || null;
+        if (Array.isArray(workspaceData)) workspaceData = workspaceData[0] || null;
+      }
 
       if (!workspaceData) {
         setLoading(false);
@@ -83,7 +87,6 @@ export default function UsagePage() {
         const response = await fetch(`/api/stripe/subscription?subscriptionId=${workspaceData.stripe_subscription_id}`);
         if (response.ok) {
           const data = await response.json();
-          setSubscriptionData(data);
           subscriptionBalance = data.amount || 0;
           currency = data.currency || 'eur';
         }
@@ -145,6 +148,18 @@ export default function UsagePage() {
     <div className="p-8">
       <h1 className="text-3xl font-semibold text-gray-900 mb-2">Usage</h1>
       <p className="text-gray-600 mb-8">Understand where your budget was spent</p>
+
+      {!workspace.stripe_subscription_id && (
+        <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+          No active billing plan. Add funds before starting billable projects.
+          <button
+            onClick={() => router.push('/account/plan')}
+            className="ml-2 font-semibold text-gray-900 underline"
+          >
+            Go to billing
+          </button>
+        </div>
+      )}
 
       {/* Usage Summary Cards */}
       {usage && (

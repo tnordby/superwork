@@ -64,12 +64,23 @@ export default function PlanPage() {
         return;
       }
 
-      // Get user's workspace
-      const { data: workspaceData } = await supabase
+      // Prefer owned workspace, then fallback to membership workspace.
+      let { data: workspaceData } = await supabase
         .from('workspaces')
         .select('*')
         .eq('owner_id', user.id)
         .maybeSingle();
+
+      if (!workspaceData) {
+        const { data: membership } = await supabase
+          .from('workspace_members')
+          .select('workspace_id, workspaces!inner(*)')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+        workspaceData = (membership?.workspaces as Workspace | Workspace[] | null) || null;
+        if (Array.isArray(workspaceData)) workspaceData = workspaceData[0] || null;
+      }
 
       if (workspaceData) {
         setWorkspace(workspaceData);
