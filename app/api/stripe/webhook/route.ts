@@ -7,6 +7,21 @@ import PaymentFailedEmail from '@/emails/templates/billing/payment-failed';
 import { formatAmount } from '@/lib/stripe/utils';
 import Stripe from 'stripe';
 
+function getCurrentPeriodEndIso(subscription: unknown): string | null {
+  if (!subscription || typeof subscription !== 'object') return null;
+  if (!('current_period_end' in subscription)) return null;
+  const raw = (subscription as { current_period_end?: unknown }).current_period_end;
+  if (typeof raw !== 'number') return null;
+  return new Date(raw * 1000).toISOString();
+}
+
+function getInvoiceSubscriptionId(invoice: unknown): string | null {
+  if (!invoice || typeof invoice !== 'object') return null;
+  if (!('subscription' in invoice)) return null;
+  const value = (invoice as { subscription?: unknown }).subscription;
+  return typeof value === 'string' && value ? value : null;
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
@@ -58,7 +73,7 @@ export async function POST(request: NextRequest) {
               stripe_subscription_status: subscription.status,
               stripe_price_id: price?.id,
               subscription_interval: interval,
-              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              current_period_end: getCurrentPeriodEndIso(subscription),
             })
             .eq('id', workspaceId);
 
@@ -85,7 +100,9 @@ export async function POST(request: NextRequest) {
                   planName: product.name,
                   amount: formatAmount(price?.unit_amount || 0, price?.currency || 'usd'),
                   billingInterval: interval,
-                  nextBillingDate: new Date(subscription.current_period_end * 1000).toLocaleDateString('en-US', {
+                  nextBillingDate: new Date(
+                    getCurrentPeriodEndIso(subscription) ?? new Date().toISOString()
+                  ).toLocaleDateString('en-US', {
                     month: 'long',
                     day: 'numeric',
                     year: 'numeric',
@@ -110,7 +127,7 @@ export async function POST(request: NextRequest) {
 
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string;
+        const subscriptionId = getInvoiceSubscriptionId(invoice);
 
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -121,7 +138,7 @@ export async function POST(request: NextRequest) {
               .from('workspaces')
               .update({
                 stripe_subscription_status: 'active',
-                current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+                current_period_end: getCurrentPeriodEndIso(subscription),
               })
               .eq('id', workspaceId);
 
@@ -133,7 +150,7 @@ export async function POST(request: NextRequest) {
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string;
+        const subscriptionId = getInvoiceSubscriptionId(invoice);
 
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -209,7 +226,7 @@ export async function POST(request: NextRequest) {
               stripe_subscription_status: subscription.status,
               stripe_price_id: subscription.items.data[0]?.price.id,
               subscription_interval: getIntervalFromPrice(subscription.items.data[0]?.price),
-              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              current_period_end: getCurrentPeriodEndIso(subscription),
             })
             .eq('id', workspaceId);
 

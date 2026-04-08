@@ -122,7 +122,7 @@ export function Sidebar() {
           ? `internal_selected_client_id:${user.id}`
           : 'internal_selected_client_id';
         const stored = window.localStorage.getItem(userScopedKey);
-        let nextSelectedId: string | null = null;
+        let nextSelectedId = '__all__';
         if (stored && customers.some((client: ClientSwitcherOption) => client.id === stored)) {
           nextSelectedId = stored;
         } else if (typeof data.workspace_id === 'string' && data.workspace_id) {

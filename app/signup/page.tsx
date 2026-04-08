@@ -50,8 +50,8 @@ export default function SignupPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, firstName }),
-        }).catch(err => {
-          console.error('Failed to send welcome email:', err);
+        }).catch(error => {
+          console.error('Failed to send welcome email:', error);
           // Don't block signup flow if email fails
         });
 
@@ -61,7 +61,7 @@ export default function SignupPage() {
           router.refresh();
         }, 2000);
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred');
       setLoading(false);
     }
@@ -193,6 +193,17 @@ export default function SignupPage() {
             <Link href="/login" className="font-medium text-gray-900 hover:underline">
               Sign in
             </Link>
+          </p>
+          <p className="mt-3 text-center text-xs text-gray-500">
+            By creating an account, you agree to our{' '}
+            <Link href="/terms" className="underline hover:text-gray-700">
+              Terms
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" className="underline hover:text-gray-700">
+              Privacy Policy
+            </Link>
+            .
           </p>
         </div>
       </div>

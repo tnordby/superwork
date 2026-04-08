@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create project
-    const projectData = {
+    const projectData: Record<string, unknown> = {
       user_id: user.id,
       workspace_id: workspaceId,
       name,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 // GET all workspaces for current user
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient();
 
@@ -57,7 +57,11 @@ export async function POST(request: NextRequest) {
 
     // 2. Parse request body
     const body = await request.json();
-    const { name, type = 'client', settings = {} } = body;
+    const name = typeof body?.name === 'string' ? body.name.trim() : '';
+    const settings =
+      body?.settings && typeof body.settings === 'object' && !Array.isArray(body.settings)
+        ? body.settings
+        : {};
 
     if (!name) {
       return NextResponse.json(
@@ -72,7 +76,7 @@ export async function POST(request: NextRequest) {
       .insert({
         name,
         owner_id: user.id,
-        type,
+        type: 'client',
         settings,
       })
       .select()

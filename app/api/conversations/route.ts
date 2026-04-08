@@ -20,22 +20,38 @@ function getInitialsFromName(name: string): string {
 }
 
 function toConversationSummary(input: Record<string, unknown>): ConversationSummary {
+  const projectsValue = input.projects;
+  const projectFromObject =
+    projectsValue && typeof projectsValue === 'object' && !Array.isArray(projectsValue)
+      ? (projectsValue as { name?: unknown }).name
+      : null;
+  const projectFromArray =
+    Array.isArray(projectsValue) &&
+    projectsValue[0] &&
+    typeof projectsValue[0] === 'object' &&
+    !Array.isArray(projectsValue[0])
+      ? (projectsValue[0] as { name?: unknown }).name
+      : null;
   const projectName =
-    input.projects?.name ??
-    (Array.isArray(input.projects) ? input.projects[0]?.name ?? null : null);
+    typeof projectFromObject === 'string'
+      ? projectFromObject
+      : typeof projectFromArray === 'string'
+        ? projectFromArray
+        : null;
 
   return {
-    id: input.id,
-    project_id: input.project_id,
+    id: typeof input.id === 'string' ? input.id : '',
+    project_id: typeof input.project_id === 'string' ? input.project_id : '',
     project_name: projectName,
-    consultant_name: input.consultant_name,
+    consultant_name: typeof input.consultant_name === 'string' ? input.consultant_name : '',
     participant_names: Array.isArray(input.participant_names)
       ? input.participant_names.filter((name: unknown) => typeof name === 'string' && name.trim().length > 0)
       : [],
-    consultant_initials: input.consultant_initials,
-    last_message: input.last_message ?? null,
-    last_message_at: input.last_message_at ?? null,
-    updated_at: input.updated_at,
+    consultant_initials:
+      typeof input.consultant_initials === 'string' ? input.consultant_initials : '',
+    last_message: typeof input.last_message === 'string' ? input.last_message : null,
+    last_message_at: typeof input.last_message_at === 'string' ? input.last_message_at : null,
+    updated_at: typeof input.updated_at === 'string' ? input.updated_at : new Date(0).toISOString(),
   };
 }
 

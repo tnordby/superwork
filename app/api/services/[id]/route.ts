@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
-import { isServicesAdmin } from '@/lib/auth/platform-role';
+import { isInternalStaff, isServicesAdmin } from '@/lib/auth/platform-role';
 
 // GET - Get single service template with SOPs and tasks
 export async function GET(
@@ -11,6 +11,16 @@ export async function GET(
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
 
     // Fetch service template
     const { data: template, error: templateError } = await supabase
@@ -23,6 +33,24 @@ export async function GET(
       console.error('Error fetching template:', templateError);
       console.error('Template ID:', id);
       return NextResponse.json({ error: 'Service template not found', details: templateError }, { status: 404 });
+    }
+
+    if (!isInternalStaff(platformRole)) {
+      return NextResponse.json(
+        {
+          template: {
+            id: template.id,
+            name: template.name,
+            category: template.category,
+            customer_description: template.customer_description,
+            estimated_hours: template.estimated_hours,
+            is_active: template.is_active,
+            created_at: template.created_at,
+            updated_at: template.updated_at,
+          },
+        },
+        { status: 200 }
+      );
     }
 
     // Fetch SOPs for this template
@@ -96,7 +124,7 @@ export async function PATCH(
 
     const body = await request.json();
 
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, unknown> = {};
     if (body.name !== undefined) updateData.name = body.name;
     if (body.category !== undefined) updateData.category = body.category;
     if (body.customer_description !== undefined)

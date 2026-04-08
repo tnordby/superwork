@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { Paperclip, MoreVertical } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
@@ -13,6 +13,14 @@ function formatTimestamp(value: string | null | undefined): string {
 }
 
 export default function InboxPage() {
+  return (
+    <Suspense fallback={<InboxLoadingFallback />}>
+      <InboxPageContent />
+    </Suspense>
+  );
+}
+
+function InboxPageContent() {
   const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const projectId = searchParams.get('projectId');
@@ -488,6 +496,14 @@ export default function InboxPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function InboxLoadingFallback() {
+  return (
+    <div className="fixed inset-0 left-64 top-16 bg-gray-50">
+      <div className="h-full flex items-center justify-center text-sm text-gray-600">Loading inbox...</div>
     </div>
   );
 }

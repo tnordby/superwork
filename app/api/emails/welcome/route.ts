@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendWelcomeEmail } from '@/lib/email/send';
+import { sendEmail } from '@/lib/email/send';
+import WelcomeEmail from '@/emails/WelcomeEmail';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,16 +13,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await sendWelcomeEmail(email, firstName);
+    const emailId = await sendEmail({
+      to: email,
+      subject: 'Welcome to Superwork',
+      template: WelcomeEmail({ firstName, email }),
+      templateId: 'AUTH-WELCOME-01',
+      metadata: { first_name: firstName },
+    });
 
-    if (!result.success) {
-      return NextResponse.json(
-        { error: result.error || 'Failed to send email' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true, id: result.id });
+    return NextResponse.json({ success: true, id: emailId });
   } catch (error) {
     console.error('Error in welcome email API:', error);
     return NextResponse.json(

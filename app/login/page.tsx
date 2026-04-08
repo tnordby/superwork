@@ -21,14 +21,21 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
       if (error) {
-        console.error('Login error:', error);
-        setError(error.message);
+        const lowerMessage = error.message.toLowerCase();
+        if (lowerMessage.includes('invalid login credentials')) {
+          setError('Email or password is incorrect. Please try again or reset your password.');
+        } else if (lowerMessage.includes('email not confirmed')) {
+          setError('Please confirm your email before signing in.');
+        } else {
+          setError(error.message);
+        }
         setLoading(false);
         return;
       }
@@ -136,10 +143,21 @@ export default function LoginPage() {
 
           {/* Sign up link */}
           <p className="mt-6 text-center text-sm text-gray-600">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/signup" className="font-medium text-gray-900 hover:underline">
               Sign up
             </Link>
+          </p>
+          <p className="mt-3 text-center text-xs text-gray-500">
+            By continuing, you agree to our{' '}
+            <Link href="/terms" className="underline hover:text-gray-700">
+              Terms
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" className="underline hover:text-gray-700">
+              Privacy Policy
+            </Link>
+            .
           </p>
         </div>
       </div>

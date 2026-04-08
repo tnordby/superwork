@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get invoices if customer exists
-    let invoices = [];
+    let invoices: Awaited<ReturnType<typeof getCustomerInvoices>> = [];
     if (workspace.stripe_customer_id) {
       invoices = await getCustomerInvoices(workspace.stripe_customer_id);
     }

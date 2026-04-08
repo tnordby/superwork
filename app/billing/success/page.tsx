@@ -1,10 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle } from 'lucide-react';
 
 export default function BillingSuccessPage() {
+  return (
+    <Suspense fallback={<BillingSuccessFallback />}>
+      <BillingSuccessContent />
+    </Suspense>
+  );
+}
+
+function BillingSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
@@ -67,6 +75,16 @@ export default function BillingSuccessPage() {
             Redirecting to billing dashboard in {countdown} seconds...
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function BillingSuccessFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm text-center text-sm text-gray-600">
+        Loading billing confirmation...
       </div>
     </div>
   );
