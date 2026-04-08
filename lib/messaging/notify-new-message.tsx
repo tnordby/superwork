@@ -1,0 +1,111 @@
+import NewInboxMessageEmail from '@/emails/NewInboxMessageEmail';
+import { sendEmail } from '@/lib/email/send';
+import { createServiceRoleClient } from '@/lib/supabase/admin';
+
+function appBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+}
+
+async function loadProfileEmails(admin: ReturnType<typeof createServiceRoleClient>, userIds: string[]) {
+  const unique = Array.from(new Set(userIds.filter(Boolean)));
+  if (unique.length === 0) return [];
+
+  const { data, error } = await admin.from('profiles').select('id, email').in('id', unique);
+  if (error) throw error;
+
+  const emails: string[] = [];
+  for (const row of data ?? []) {
+    const email = typeof row.email === 'string' ? row.email.trim() : '';
+    if (email) emails.push(email);
+  }
+  return emails;
+}
+
+export type NotifyNewInboxMessageParams = {
+  conversationId: string;
+  projectId: string;
+  customerUserId: string;
+  senderUserId: string;
+  senderName: string;
+  isFromCustomer: boolean;
+  preview: string;
+};
+
+/**
+ * Best-effort email to the other party on the thread. Does not throw to callers.
+ * Requires RESEND_API_KEY and SUPABASE_SERVICE_ROLE_KEY.
+ */
+export async function notifyNewInboxMessage(params: NotifyNewInboxMessageParams): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+
+  let admin: ReturnType<typeof createServiceRoleClient>;
+  try {
+    admin = createServiceRoleClient();
+  } catch {
+    return;
+  }
+
+  try {
+    const { data: project, error: projectError } = await admin
+      .from('projects')
+      .select('name')
+      .eq('id', params.projectId)
+      .maybeSingle();
+
+    if (projectError) throw projectError;
+    const projectName = typeof project?.name === 'string' && project.name.trim() ? project.name.trim() : 'Project';
+
+    const inboxUrl = `${appBaseUrl()}/inbox`;
+    const preview =
+      params.preview.length > 280 ? `${params.preview.slice(0, 277).trimEnd()}…` : params.preview;
+
+    const senderEmails = await loadProfileEmails(admin, [params.senderUserId]);
+    const senderEmail = senderEmails[0] ?? null;
+
+    let recipientEmails: string[] = [];
+
+    if (params.isFromCustomer) {
+      const { data: assignments, error: assignError } = await admin
+        .from('project_assignments')
+        .select('user_id')
+        .eq('project_id', params.projectId)
+        .is('removed_at', null);
+
+      if (assignError) throw assignError;
+      const ids = (assignments ?? []).map((a) => a.user_id as string).filter(Boolean);
+      recipientEmails = await loadProfileEmails(admin, ids);
+    } else {
+      recipientEmails = await loadProfileEmails(admin, [params.customerUserId]);
+    }
+
+    const deduped = Array.from(new Set(recipientEmails.map((e) => e.toLowerCase())));
+    const filtered = deduped.filter((e) => !senderEmail || e.toLowerCase() !== senderEmail.toLowerCase());
+
+    await Promise.all(
+      filtered.map((to) =>
+        sendEmail({
+          to,
+          subject: `New message: ${projectName}`,
+          template: (
+            <NewInboxMessageEmail
+              recipientLabel="there"
+              projectName={projectName}
+              senderName={params.senderName}
+              preview={preview}
+              inboxUrl={`${inboxUrl}?projectId=${encodeURIComponent(params.projectId)}`}
+            />
+          ),
+          templateId: 'new_inbox_message',
+          metadata: {
+            conversationId: params.conversationId,
+            projectId: params.projectId,
+            senderUserId: params.senderUserId,
+            isFromCustomer: params.isFromCustomer,
+          },
+        })
+      )
+    );
+  } catch (e) {
+    console.error('[notifyNewInboxMessage] failed:', e);
+  }
+}

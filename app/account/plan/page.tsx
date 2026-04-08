@@ -177,7 +177,8 @@ export default function PlanPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create portal session');
+        const data = await response.json().catch(() => null);
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to create portal session');
       }
 
       const { url } = await response.json();
@@ -187,7 +188,11 @@ export default function PlanPage() {
       }
     } catch (error) {
       console.error('Error creating portal session:', error);
-      setPageError('Failed to open billing portal. Please try again.');
+      setPageError(
+        error instanceof Error
+          ? `We couldn’t open the billing portal. ${error.message}`
+          : 'We couldn’t open the billing portal. Please try again.'
+      );
     } finally {
       setManagingBilling(false);
     }
@@ -195,7 +200,7 @@ export default function PlanPage() {
 
   const handleSubscribe = async (priceId: string) => {
     if (!workspace?.id) {
-      setPageError('Workspace not found. Please refresh the page.');
+      setPageError('We couldn’t find your workspace. Refresh the page and try again.');
       return;
     }
 
@@ -228,7 +233,9 @@ export default function PlanPage() {
     } catch (error) {
       console.error('Error creating checkout session:', error);
       setPageError(
-        `Failed to start checkout: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error instanceof Error
+          ? `We couldn’t start checkout. ${error.message}`
+          : 'We couldn’t start checkout. Please try again.'
       );
     } finally {
       setSubscribingToPlan(null);

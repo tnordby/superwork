@@ -4,6 +4,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/api';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { hasFullMessagingAccess, isConsultant, isInternalStaff } from '@/lib/auth/platform-role';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
+import { DEFAULT_TEAM_CONTACT_NAME } from '@/lib/messaging/constants';
 
 function getInitialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -24,14 +25,11 @@ export async function GET(request: NextRequest) {
   const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
   try {
-    // For now, customer/consultant message threads are project-scoped.
-    // Customers can start threads for their own projects.
-    // Consultants see only projects assigned to them.
-    // Admin/PM can see all projects with assignee.
+    // Threads are project-scoped. Customers see their projects (with or without a named assignee).
+    // Consultants see assigned projects. Admin/PM see projects in the selected workspace (or all).
     let projectsQuery = supabase
       .from('projects')
       .select('id, name, assignee, workspace_id')
-      .not('assignee', 'is', null)
       .order('updated_at', { ascending: false });
 
     if (isInternalStaff(platformRole) && selectedWorkspaceId) {
@@ -60,16 +58,20 @@ export async function GET(request: NextRequest) {
     const { data: projects, error } = await projectsQuery;
     if (error) throw error;
 
-    const options = (projects ?? []).map((project) => ({
-      projectId: project.id as string,
-      projectName: (project.name as string) ?? 'Project',
-      contacts: [
-        {
-          name: project.assignee as string,
-          initials: getInitialsFromName(project.assignee as string),
-        },
-      ],
-    }));
+    const options = (projects ?? []).map((project) => {
+      const assignee = typeof project.assignee === 'string' && project.assignee.trim() ? project.assignee.trim() : null;
+      const contactName = assignee ?? DEFAULT_TEAM_CONTACT_NAME;
+      return {
+        projectId: project.id as string,
+        projectName: (project.name as string) ?? 'Project',
+        contacts: [
+          {
+            name: contactName,
+            initials: getInitialsFromName(contactName),
+          },
+        ],
+      };
+    });
 
     return NextResponse.json({ options }, { status: 200 });
   } catch (e) {

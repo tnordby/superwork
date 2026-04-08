@@ -37,6 +37,7 @@ export default function BalancePage() {
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
   const [projectCosts, setProjectCosts] = useState<ProjectCosts>({ usedBalance: 0, committedBalance: 0 });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function BalancePage() {
   }, []);
 
   const fetchBalance = async () => {
+    setLoadError(null);
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -104,6 +106,7 @@ export default function BalancePage() {
       }
     } catch (error) {
       console.error('Error fetching balance:', error);
+      setLoadError('We couldn’t load your balance. Refresh the page or try again in a moment.');
     } finally {
       setLoading(false);
     }
@@ -151,6 +154,11 @@ export default function BalancePage() {
       {/* Header with available balance and funding action */}
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-gray-900 mb-6">Balance</h1>
+        {loadError && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {loadError}
+          </div>
+        )}
 
         <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-6">
           <div className="flex items-center gap-4">

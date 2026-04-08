@@ -4,6 +4,13 @@ import { cookies } from 'next/headers';
 import type { PlatformRole } from '@/lib/auth/platform-role';
 import { isInternalStaff } from '@/lib/auth/platform-role';
 
+/**
+ * Selected client workspace cookie for internal staff. Many routes scope reads/writes when set;
+ * messaging (conversations + messages) allows all-clients mode but still enforces a match when
+ * this cookie is present. Stricter “must select context” flows include project PATCH/DELETE,
+ * quote updates, asset mutations, and intake updates (see grep for readSelectedWorkspaceIdFromRequest).
+ */
+
 export const INTERNAL_SELECTED_WORKSPACE_COOKIE = 'internal_selected_workspace_id';
 
 export function readSelectedWorkspaceIdFromRequest(request: NextRequest): string | null {

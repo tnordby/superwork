@@ -18,6 +18,24 @@ type DashboardProjectRow = {
   progress: number | null;
   cost: number | null;
   updated_at: string;
+  assignee: string | null;
+};
+
+type DashboardProjectDbRow = {
+  id: string;
+  name?: string | null;
+  status?: string | null;
+  progress?: number | null;
+  cost?: number | null;
+  updated_at: string;
+  assignee?: string | null;
+};
+
+type DashboardMessageActivityRow = {
+  id: string;
+  created_at: string;
+  sender_name?: string | null;
+  conversations?: { projects?: { name?: string | null } | { name?: string | null }[] } | null;
 };
 
 type DashboardData = {
@@ -101,6 +119,14 @@ function toneClasses(tone: 'blue' | 'green' | 'purple'): string {
   return 'bg-blue-100 text-blue-600';
 }
 
+function dashboardProjectInboxHref(project: Pick<DashboardProjectRow, 'id' | 'assignee'>): string {
+  const p = new URLSearchParams({ projectId: project.id });
+  if (project.assignee) {
+    p.set('consultantName', project.assignee);
+  }
+  return `/inbox?${p.toString()}`;
+}
+
 async function loadDashboardData(): Promise<DashboardData> {
   const fallback: DashboardData = {
     activeProjects: [],
@@ -170,14 +196,14 @@ async function loadDashboardData(): Promise<DashboardData> {
     };
 
     let { data: projectRows, error: projectsError } = await loadProjectsWithScope(
-      'id, name, status, progress, cost, updated_at'
+      'id, name, status, progress, cost, updated_at, assignee'
     );
 
     // Some environments may not have all billing columns yet (e.g., `cost`).
     // Retry with a minimal select so Active Projects still renders correctly.
     if (projectsError) {
       console.error('[dashboard] Failed to load projects with cost column:', projectsError);
-      const retry = await loadProjectsWithScope('id, name, status, progress, updated_at');
+      const retry = await loadProjectsWithScope('id, name, status, progress, updated_at, assignee');
       projectRows = retry.data;
       projectsError = retry.error;
     }
@@ -187,13 +213,14 @@ async function loadDashboardData(): Promise<DashboardData> {
       return fallback;
     }
 
-    const projects: DashboardProjectRow[] = (projectRows ?? []).map((project: any) => ({
+    const projects: DashboardProjectRow[] = (projectRows ?? []).map((project: DashboardProjectDbRow) => ({
       id: project.id,
       name: project.name,
       status: project.status,
       progress: typeof project.progress === 'number' ? project.progress : 0,
       cost: typeof project.cost === 'number' ? project.cost : 0,
       updated_at: project.updated_at,
+      assignee: typeof project.assignee === 'string' && project.assignee.trim() ? project.assignee.trim() : null,
     }));
 
     const usedBalance = sumUsedBalanceCents(projects);
@@ -254,14 +281,12 @@ async function loadDashboardData(): Promise<DashboardData> {
       console.error('[dashboard] Failed to load message activity:', messagesError);
     }
 
-    const messageActivity = (messageRows ?? []).map((message: any) => {
+    const messageActivity = (messageRows ?? []).map((message: DashboardMessageActivityRow) => {
       const conversation = Array.isArray(message.conversations)
         ? message.conversations[0]
         : message.conversations;
-      const project =
-        conversation?.projects && Array.isArray(conversation.projects)
-          ? conversation.projects[0]
-          : conversation?.projects;
+      const projectsField = conversation?.projects;
+      const project = Array.isArray(projectsField) ? projectsField[0] : projectsField;
       const projectName = project?.name ?? 'Project';
       const senderName = message.sender_name ?? 'Team';
 
@@ -360,6 +385,12 @@ export default async function Home() {
                       style={{ width: `${project.progress ?? 0}%` }}
                     />
                   </div>
+                  <Link
+                    href={dashboardProjectInboxHref(project)}
+                    className="mt-3 inline-block text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    Open messages
+                  </Link>
                 </div>
               ))}
             </div>

@@ -5,6 +5,10 @@ import type { MessageRow } from '@/types/messaging';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff } from '@/lib/auth/platform-role';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
+import { notifyNewInboxMessage } from '@/lib/messaging/notify-new-message';
+
+// Internal staff may load/send without a selected client; when a workspace is pinned, the
+// conversation’s project must belong to that workspace (403 otherwise).
 
 function getUserDisplayName(user: { user_metadata?: Record<string, unknown>; email?: string }): string {
   const first = user.user_metadata?.first_name;
@@ -165,6 +169,16 @@ export async function POST(
         last_message_at: new Date().toISOString(),
       })
       .eq('id', conversationId);
+
+    await notifyNewInboxMessage({
+      conversationId,
+      projectId: String(conversation.project_id),
+      customerUserId: String(conversation.user_id),
+      senderUserId: user.id,
+      senderName,
+      isFromCustomer,
+      preview: trimmed,
+    });
 
     return NextResponse.json({ message: toMessageRow(created) }, { status: 201 });
   } catch (e) {

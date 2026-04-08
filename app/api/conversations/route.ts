@@ -5,6 +5,17 @@ import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { hasFullMessagingAccess, isConsultant, isInternalStaff } from '@/lib/auth/platform-role';
 import type { ConversationSummary } from '@/types/messaging';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
+import { checkCustomerConsultantName } from '@/lib/messaging/conversation-rules';
+
+/**
+ * Messaging (this route + messages route):
+ * - Threads are scoped to a project; conversation.user_id is the customer (project owner).
+ * - Customers may only create threads for their own projects, using the project assignee’s display
+ *   name or the fixed label DEFAULT_TEAM_CONTACT_NAME when no assignee is set (see lib/messaging/constants).
+ * - Consultants must be assigned to the project. Admin/PM have full access.
+ * - Internal staff: creating/sending is allowed without a selected client context; when a client
+ *   context is selected, the project must belong to that workspace (403 otherwise).
+ */
 
 function getInitialsFromName(name: string): string {
   const parts = name
@@ -161,11 +172,12 @@ export async function POST(request: NextRequest) {
   if (errorResponse) return errorResponse;
 
   const body = await request.json();
-  const projectId = body?.projectId;
-  const consultantName = body?.consultantName;
+  const projectId = typeof body?.projectId === 'string' ? body.projectId.trim() : '';
+  const consultantName =
+    typeof body?.consultantName === 'string' ? body.consultantName.trim() : '';
   const participantNamesInput = Array.isArray(body?.participantNames) ? body.participantNames : [];
 
-  if (typeof projectId !== 'string' || !projectId || typeof consultantName !== 'string' || !consultantName) {
+  if (!projectId || !consultantName) {
     return NextResponse.json(
       { error: 'projectId and consultantName are required' },
       { status: 400 }
@@ -199,7 +211,8 @@ export async function POST(request: NextRequest) {
     }
 
     const customerUserId = project.user_id as string;
-    const projectAssignee = (project.assignee as string | null) ?? null;
+    const projectAssignee =
+      typeof project.assignee === 'string' && project.assignee.trim() ? project.assignee.trim() : null;
     const projectWorkspaceId = (project.workspace_id as string | null) ?? null;
 
     if (isInternalStaff(platformRole) && selectedWorkspaceId && projectWorkspaceId !== selectedWorkspaceId) {
@@ -212,18 +225,9 @@ export async function POST(request: NextRequest) {
         if (customerUserId !== user.id) {
           return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
-        // Customers may only start a conversation with the assigned contact for that project.
-        if (!projectAssignee) {
-          return NextResponse.json(
-            { error: 'This project has no assigned consultant yet' },
-            { status: 400 }
-          );
-        }
-        if (consultantName !== projectAssignee) {
-          return NextResponse.json(
-            { error: 'You can only message the contact assigned to this project' },
-            { status: 403 }
-          );
+        const consultantCheck = checkCustomerConsultantName(consultantName, projectAssignee);
+        if (!consultantCheck.allowed) {
+          return NextResponse.json({ error: consultantCheck.message }, { status: consultantCheck.status });
         }
       } else {
         const { data: assignment, error: assignmentError } = await supabase

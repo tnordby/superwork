@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -124,6 +124,15 @@ export default function ProjectDetailPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [viewingClientName, setViewingClientName] = useState<string | null>(null);
+
+  const projectInboxHref = useMemo(() => {
+    if (!project) return '/inbox';
+    const p = new URLSearchParams({ projectId: project.id });
+    if (typeof project.assignee === 'string' && project.assignee.trim()) {
+      p.set('consultantName', project.assignee.trim());
+    }
+    return `/inbox?${p.toString()}`;
+  }, [project]);
 
   useEffect(() => {
     async function loadContext() {
@@ -672,58 +681,59 @@ export default function ProjectDetailPage() {
         <div className="w-80 space-y-6 sticky top-24 self-start">
           {/* Consultant Card */}
           <div className="rounded-xl border border-gray-200 bg-white p-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Your Consultant</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Your consultant</h3>
 
             {project.assignee ? (
-              <div className="space-y-4">
-                {/* Profile */}
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-full bg-[#bfe937] flex items-center justify-center">
-                    <span className="text-lg font-semibold text-gray-900">
-                      {project.assignee.split(' ').map(n => n[0]).join('')}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{project.assignee}</p>
-                    <p className="text-xs text-gray-600">Lead Consultant</p>
-                  </div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-12 w-12 rounded-full bg-[#bfe937] flex items-center justify-center">
+                  <span className="text-lg font-semibold text-gray-900">
+                    {project.assignee.split(' ').map((n) => n[0]).join('')}
+                  </span>
                 </div>
-
-                {/* Contact Actions */}
-                <div className="space-y-2">
-                  <a
-                    href={`mailto:consultant@superwork.com?subject=Project: ${project.name}`}
-                    className="flex items-center gap-3 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <Mail className="h-4 w-4 text-gray-600" />
-                    <span>Send Email</span>
-                  </a>
-
-                  <Link
-                    href={`/inbox?projectId=${encodeURIComponent(project.id)}&consultantName=${encodeURIComponent(project.assignee || '')}`}
-                    className="flex items-center gap-3 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <MessageCircle className="h-4 w-4 text-gray-600" />
-                    <span>Send Message</span>
-                  </Link>
-
-                  <a
-                    href="https://calendly.com/superwork-consultant"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 w-full rounded-lg bg-[#bfe937] px-4 py-3 text-sm font-medium text-gray-900 hover:opacity-90 transition-opacity"
-                  >
-                    <Calendar className="h-4 w-4" />
-                    <span>Book Meeting</span>
-                  </a>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{project.assignee}</p>
+                  <p className="text-xs text-gray-600">Lead consultant</p>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-4">
+              <div className="mb-4 rounded-lg bg-gray-50 px-3 py-4 text-center">
                 <User className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-600">No consultant assigned yet</p>
+                <p className="text-sm text-gray-700">No lead consultant assigned yet.</p>
+                <p className="mt-1 text-xs text-gray-600">
+                  You can still message our team about this project from your inbox.
+                </p>
               </div>
             )}
+
+            <div className="space-y-2">
+              {project.assignee ? (
+                <a
+                  href={`mailto:consultant@superwork.com?subject=Project: ${project.name}`}
+                  className="flex items-center gap-3 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Mail className="h-4 w-4 text-gray-600" />
+                  <span>Send email</span>
+                </a>
+              ) : null}
+
+              <Link
+                href={projectInboxHref}
+                className="flex items-center gap-3 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <MessageCircle className="h-4 w-4 text-gray-600" />
+                <span>Open messages</span>
+              </Link>
+
+              <a
+                href="https://calendly.com/superwork-consultant"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 w-full rounded-lg bg-[#bfe937] px-4 py-3 text-sm font-medium text-gray-900 hover:opacity-90 transition-opacity"
+              >
+                <Calendar className="h-4 w-4" />
+                <span>Book meeting</span>
+              </a>
+            </div>
           </div>
 
           {/* Project Details Card */}

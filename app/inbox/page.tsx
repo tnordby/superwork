@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { Paperclip, MoreVertical } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { DEFAULT_TEAM_CONTACT_NAME } from '@/lib/messaging/constants';
 import type { ConversationSummary, MessageRow, ConversationOption } from '@/types/messaging';
 
 function formatTimestamp(value: string | null | undefined): string {
@@ -114,24 +115,33 @@ function InboxPageContent() {
         if (projectId) qs.set('projectId', projectId);
 
         const res = await fetch(`/api/conversations?${qs.toString()}`);
-        if (!res.ok) throw new Error('Failed to load conversations');
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || 'Failed to load conversations');
+        }
 
         const data = await res.json();
         let list: ConversationSummary[] = data.conversations ?? [];
 
         // If we arrived here from a project context and there is no thread yet,
         // create the conversation so the user can immediately send a message.
-        if (list.length === 0 && projectId && consultantName) {
+        const consultantForCreate = consultantName?.trim() || DEFAULT_TEAM_CONTACT_NAME;
+        if (list.length === 0 && projectId) {
           const createRes = await fetch('/api/conversations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ projectId, consultantName }),
+            body: JSON.stringify({ projectId, consultantName: consultantForCreate }),
           });
 
           if (createRes.ok) {
             const createdData = await createRes.json();
             const created: ConversationSummary | null = createdData.conversation ?? null;
             if (created) list = [created];
+          } else {
+            const errData = await createRes.json().catch(() => null);
+            if (errData?.error && typeof errData.error === 'string') {
+              setError(errData.error);
+            }
           }
         }
 
@@ -142,7 +152,7 @@ function InboxPageContent() {
         });
       } catch (e) {
         console.error(e);
-        setError('Unable to load inbox conversations.');
+        setError(e instanceof Error ? e.message : 'Unable to load inbox conversations.');
       } finally {
         setLoadingConversations(false);
       }
@@ -288,7 +298,9 @@ function InboxPageContent() {
 
             <div className="mt-4 rounded-2xl border border-gray-200 p-4">
               <p className="text-sm font-semibold text-gray-900">Start a conversation</p>
-              <p className="mt-1 text-xs text-gray-600">Choose a project and person to message.</p>
+              <p className="mt-1 text-xs text-gray-600">
+                Pick a project, then a contact. If no one is assigned yet, choose {DEFAULT_TEAM_CONTACT_NAME}.
+              </p>
 
               <label className="mt-4 mb-1 block text-xs font-medium text-gray-700">Project</label>
               <select
@@ -356,9 +368,18 @@ function InboxPageContent() {
             )}
 
             {loadingConversations ? (
-              <div className="p-6 text-sm text-gray-500">Loading…</div>
+              <div className="p-6 space-y-3">
+                <div className="h-4 w-40 animate-pulse rounded bg-gray-200" />
+                <div className="h-16 animate-pulse rounded-xl bg-gray-100" />
+                <div className="h-16 animate-pulse rounded-xl bg-gray-100" />
+              </div>
             ) : conversations.length === 0 ? (
-              <div className="p-6 text-sm text-gray-500">No conversations yet.</div>
+              <div className="p-6 text-sm text-gray-600">
+                <p className="font-medium text-gray-900">No conversations yet</p>
+                <p className="mt-2 text-gray-600">
+                  Start one with the form above, or open a project and choose &quot;Open messages&quot;.
+                </p>
+              </div>
             ) : (
               conversations.map((conversation) => (
                 <button
@@ -430,9 +451,16 @@ function InboxPageContent() {
 
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {loadingMessages ? (
-              <div className="text-sm text-gray-500">Loading messages…</div>
+              <div className="space-y-3">
+                <div className="h-4 w-48 animate-pulse rounded bg-gray-100" />
+                <div className="h-12 w-2/3 animate-pulse rounded-2xl bg-gray-100" />
+                <div className="h-12 w-1/2 animate-pulse rounded-2xl bg-gray-100 ml-auto" />
+              </div>
             ) : messages.length === 0 ? (
-              <div className="text-sm text-gray-500">No messages yet.</div>
+              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-8 text-center text-sm text-gray-600">
+                <p className="font-medium text-gray-900">No messages in this thread yet</p>
+                <p className="mt-2">Send a note below to get the conversation started.</p>
+              </div>
             ) : (
               messages.map((message) => {
                 const isYou = user?.id && message.sender_id === user.id;
@@ -506,7 +534,10 @@ function InboxPageContent() {
 function InboxLoadingFallback() {
   return (
     <div className="fixed inset-0 left-64 top-16 bg-gray-50">
-      <div className="h-full flex items-center justify-center text-sm text-gray-600">Loading inbox...</div>
+      <div className="h-full flex flex-col items-center justify-center gap-3 text-sm text-gray-600">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" aria-hidden />
+        <span>Loading inbox…</span>
+      </div>
     </div>
   );
 }
