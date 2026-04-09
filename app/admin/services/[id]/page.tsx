@@ -15,15 +15,6 @@ const CATEGORIES = [
   'Other',
 ]
 
-interface Service {
-  id: string
-  name: string
-  category: string
-  customer_description: string | null
-  estimated_hours: number | null
-  is_active: boolean
-}
-
 export default function EditServicePage() {
   const router = useRouter()
   const params = useParams()
@@ -39,10 +30,6 @@ export default function EditServicePage() {
     estimated_hours: '',
     is_active: true,
   })
-
-  useEffect(() => {
-    loadService()
-  }, [serviceId])
 
   async function loadService() {
     const { data, error } = await supabase
@@ -66,6 +53,10 @@ export default function EditServicePage() {
     })
     setLoading(false)
   }
+
+  useEffect(() => {
+    void loadService()
+  }, [serviceId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

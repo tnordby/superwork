@@ -36,10 +36,6 @@ export default function AdminSOPsPage() {
     description: '',
   })
 
-  useEffect(() => {
-    loadData()
-  }, [serviceId])
-
   async function loadData() {
     setLoading(true)
 
@@ -62,6 +58,10 @@ export default function AdminSOPsPage() {
     setSOPs(sopsData || [])
     setLoading(false)
   }
+
+  useEffect(() => {
+    void loadData()
+  }, [serviceId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

@@ -47,10 +47,6 @@ export default function AdminTasksPage() {
     estimated_hours: '',
   })
 
-  useEffect(() => {
-    loadData()
-  }, [sopId])
-
   async function loadData() {
     setLoading(true)
 
@@ -87,6 +83,10 @@ export default function AdminTasksPage() {
 
     setLoading(false)
   }
+
+  useEffect(() => {
+    void loadData()
+  }, [sopId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -341,7 +341,7 @@ export default function AdminTasksPage() {
       {tasks.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
           <p className="text-gray-600">
-            No tasks yet. Add your first task to define this SOP's checklist.
+            No tasks yet. Add your first task to define this SOP&apos;s checklist.
           </p>
         </div>
       ) : (

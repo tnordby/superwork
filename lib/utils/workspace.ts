@@ -48,7 +48,7 @@ export async function getOrCreateWorkspace() {
   }
 
   // Try to get existing workspace
-  let workspace = await getUserWorkspace();
+  const workspace = await getUserWorkspace();
 
   if (workspace) {
     return workspace;

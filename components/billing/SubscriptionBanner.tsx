@@ -1,7 +1,17 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { AlertCircle, CreditCard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+
+function useTickingNowMs(intervalMs = 60_000) {
+  const [ms, setMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setMs(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return ms;
+}
 
 interface SubscriptionBannerProps {
   status: string;
@@ -13,6 +23,7 @@ export function SubscriptionBanner({
   currentPeriodEnd,
 }: SubscriptionBannerProps) {
   const router = useRouter();
+  const nowMs = useTickingNowMs();
 
   if (status === 'past_due') {
     return (
@@ -67,7 +78,7 @@ export function SubscriptionBanner({
 
   if (status === 'trialing' && currentPeriodEnd) {
     const daysLeft = Math.ceil(
-      (new Date(currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      (new Date(currentPeriodEnd).getTime() - nowMs) / (1000 * 60 * 60 * 24)
     );
 
     if (daysLeft <= 7) {

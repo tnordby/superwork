@@ -3,8 +3,6 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-
 interface Service {
   id: string
   name: string
@@ -19,12 +17,7 @@ export default function AdminServicesPage() {
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const router = useRouter()
   const supabase = createClient()
-
-  useEffect(() => {
-    loadServices()
-  }, [])
 
   async function loadServices() {
     setLoading(true)
@@ -41,6 +34,10 @@ export default function AdminServicesPage() {
     }
     setLoading(false)
   }
+
+  useEffect(() => {
+    void loadServices()
+  }, [])
 
   async function handleDelete(id: string) {
     const response = await fetch(`/api/services/${id}`, {
