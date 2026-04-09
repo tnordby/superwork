@@ -119,7 +119,9 @@ function CreateProjectForm() {
   }, [searchParams]);
 
   // Format dynamic intake form responses into markdown description
-  const formatIntakeResponses = async (responses: Record<string, any>, templateId: string) => {
+  type IntakeFieldDef = { field_name: string; label: string; field_type?: string };
+
+  const formatIntakeResponses = async (responses: Record<string, unknown>, templateId: string) => {
     // Fetch the intake form fields to get labels
     const intakeFormRes = await fetch(`/api/services/${templateId}/intake-form`);
     const intakeFormData = await intakeFormRes.json();
@@ -129,7 +131,7 @@ function CreateProjectForm() {
     let intakeFormMarkdown = '\n\n# Intake Form\n\n';
 
     if (intakeFormData.fields) {
-      intakeFormData.fields.forEach((field: any) => {
+      (intakeFormData.fields as IntakeFieldDef[]).forEach((field) => {
         const value = responses[field.field_name];
         if (value !== undefined && value !== null && value !== '') {
           intakeFormMarkdown += `## ${field.label}\n`;
@@ -148,7 +150,7 @@ function CreateProjectForm() {
     return standardDescription + intakeFormMarkdown;
   };
 
-  const handleIntakeFormSubmit = async (responses: Record<string, any>) => {
+  const handleIntakeFormSubmit = async (responses: Record<string, unknown>) => {
     setIntakeResponses(responses);
     setLoading(true);
     setError('');
@@ -162,7 +164,7 @@ function CreateProjectForm() {
         description = await formatIntakeResponses(responses, templateId);
       }
 
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         name: serviceTemplate?.name || formData.name || 'Untitled Project',
         description: description,
         category: serviceTemplate?.category || formData.category,
@@ -205,8 +207,8 @@ function CreateProjectForm() {
 
       // Redirect to the new project
       router.push(`/projects/${data.project.id}`);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create project');
       setLoading(false);
     }
   };
@@ -219,7 +221,7 @@ function CreateProjectForm() {
     try {
       const templateId = searchParams.get('templateId');
 
-      const payload: any = { ...formData };
+      const payload: Record<string, unknown> = { ...formData };
 
       // If we have a template, include the template ID
       if (templateId) {
@@ -262,8 +264,8 @@ function CreateProjectForm() {
 
       // Redirect to the new project
       router.push(`/projects/${data.project.id}`);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create project');
       setLoading(false);
     }
   };

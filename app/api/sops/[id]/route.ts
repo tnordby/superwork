@@ -28,7 +28,7 @@ export async function PATCH(
   const body = await request.json()
   const { title, description, order_index } = body
 
-  const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (title !== undefined) updates.title = title
   if (description !== undefined) updates.description = description
   if (order_index !== undefined) updates.order_index = order_index

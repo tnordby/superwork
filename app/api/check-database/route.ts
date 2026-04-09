@@ -23,7 +23,7 @@ export async function GET() {
 
   for (const table of tables) {
     try {
-      const { data, error, count } = await supabase
+      const { error, count } = await supabase
         .from(table)
         .select('*', { count: 'exact', head: true });
 
@@ -32,8 +32,9 @@ export async function GET() {
       } else {
         results[table] = { exists: true, rowCount: count || 0 };
       }
-    } catch (err: any) {
-      results[table] = { exists: false, error: err.message };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      results[table] = { exists: false, error: message };
     }
   }
 

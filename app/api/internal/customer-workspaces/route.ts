@@ -40,7 +40,10 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        customers: (data || []).map((w: any) => ({ id: w.id, name: w.name || 'Customer' })),
+        customers: (data || []).map((w: { id: string; name: string | null }) => ({
+          id: w.id,
+          name: w.name || 'Customer',
+        })),
       },
       { status: 200 }
     );

@@ -68,8 +68,8 @@ export default function ProjectDetailPage() {
         }
 
         setProject(data.project);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to load project');
       } finally {
         setLoading(false);
       }

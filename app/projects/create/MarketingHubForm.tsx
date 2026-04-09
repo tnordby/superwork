@@ -42,7 +42,7 @@ export default function MarketingHubForm({
   loading,
   estimatedHours,
 }: Props) {
-  const updateField = (field: keyof MarketingFormData, value: any) => {
+  const updateField = <K extends keyof MarketingFormData>(field: K, value: MarketingFormData[K]) => {
     setMarketingFormData({ ...marketingFormData, [field]: value });
   };
 

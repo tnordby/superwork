@@ -33,7 +33,7 @@ export default function PaymentFailedEmail({
           margin: '0 0 16px 0',
         }}
       >
-        We couldn't process your payment
+        We couldn&apos;t process your payment
       </Heading>
 
       <Text
@@ -44,7 +44,7 @@ export default function PaymentFailedEmail({
           margin: '0 0 24px 0',
         }}
       >
-        Hi {userName}, we tried to charge {amount} for your {planName} subscription, but the payment didn't go through.
+        Hi {userName}, we tried to charge {amount} for your {planName} subscription, but the payment didn&apos;t go through.
       </Text>
 
       <div
@@ -74,7 +74,7 @@ export default function PaymentFailedEmail({
             margin: '0',
           }}
         >
-          We'll automatically retry your payment on {retryDate}. To avoid any service interruption, please update your payment method now.
+          We&apos;ll automatically retry your payment on {retryDate}. To avoid any service interruption, please update your payment method now.
         </Text>
       </div>
 
@@ -121,7 +121,7 @@ export default function PaymentFailedEmail({
           textAlign: 'center',
         }}
       >
-        Need help? Contact our support team — we're happy to assist.
+        Need help? Contact our support team — we&apos;re happy to assist.
       </Text>
     </EmailLayout>
   );

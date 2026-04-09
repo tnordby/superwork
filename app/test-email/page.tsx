@@ -6,7 +6,7 @@ export default function TestEmailPage() {
   const [email, setEmail] = useState('');
   const [template, setTemplate] = useState('welcome');
   const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
 
   const sendTestEmail = async () => {
     setSending(true);

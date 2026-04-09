@@ -47,7 +47,7 @@ export default function SubscriptionActivatedEmail({
           margin: '0 0 24px 0',
         }}
       >
-        Hi {userName}, your subscription to Superwork {planName} is now active. We're excited to help you bring your creative projects to life.
+        Hi {userName}, your subscription to Superwork {planName} is now active. We&apos;re excited to help you bring your creative projects to life.
       </Text>
 
       <div
@@ -146,7 +146,7 @@ export default function SubscriptionActivatedEmail({
           textAlign: 'center',
         }}
       >
-        Have questions? We're here to help. Reply to this email anytime.
+        Have questions? We&apos;re here to help. Reply to this email anytime.
       </Text>
     </EmailLayout>
   );

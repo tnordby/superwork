@@ -33,7 +33,7 @@ export default function WelcomeClientEmail({
           margin: '0 0 24px 0',
         }}
       >
-        We're excited to have you on board. Superwork is your centralized hub for managing all your professional creative services — from design and development to strategy and consulting.
+        We&apos;re excited to have you on board. Superwork is your centralized hub for managing all your professional creative services — from design and development to strategy and consulting.
       </Text>
 
       <Text
@@ -44,7 +44,7 @@ export default function WelcomeClientEmail({
           margin: '0 0 24px 0',
         }}
       >
-        Here's what you can do with your Superwork account:
+        Here&apos;s what you can do with your Superwork account:
       </Text>
 
       <ul

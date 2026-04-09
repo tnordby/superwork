@@ -36,6 +36,10 @@ export default function WelcomeEmail({ firstName, email }: WelcomeEmailProps) {
             <Text style={listItem}>• Track your account usage and billing</Text>
           </Section>
 
+          <Text style={text}>
+            You&apos;ll sign in with <strong>{email}</strong>.
+          </Text>
+
           <Section style={buttonSection}>
             <Link href="http://localhost:3001" style={button}>
               Go to Your Portal

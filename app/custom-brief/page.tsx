@@ -90,9 +90,11 @@ ${formData.additionalContext || 'Not specified'}
 
       // Redirect to quotes page with success message
       router.push('/quotes?briefSubmitted=true');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error submitting brief:', error);
-      alert(`Failed to submit brief: ${error.message}`);
+      alert(
+        `Failed to submit brief: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     } finally {
       setLoading(false);
     }

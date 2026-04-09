@@ -49,9 +49,11 @@ function QuoteRequestForm() {
 
       // Redirect to quotes page with success message
       router.push('/quotes?quoteRequested=true');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error submitting quote request:', error);
-      alert(`Failed to submit request: ${error.message}`);
+      alert(
+        `Failed to submit request: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     } finally {
       setLoading(false);
     }

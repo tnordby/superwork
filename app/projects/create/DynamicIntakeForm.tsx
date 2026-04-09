@@ -107,7 +107,7 @@ export default function DynamicIntakeForm({
     setVisibleFields(newVisibleFields)
   }, [responses, conditions])
 
-  const handleFieldChange = (fieldName: string, value: any) => {
+  const handleFieldChange = (fieldName: string, value: unknown) => {
     setResponses((prev) => ({
       ...prev,
       [fieldName]: value,

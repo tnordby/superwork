@@ -45,7 +45,7 @@ export default function PasswordResetEmail({ firstName, resetLink }: PasswordRes
 
           <Section style={warningBox}>
             <Text style={warningText}>
-              <strong>Security Notice:</strong> If you didn't request this password reset, please ignore this email or contact support if you have concerns about your account security.
+              <strong>Security Notice:</strong> If you didn&apos;t request this password reset, please ignore this email or contact support if you have concerns about your account security.
             </Text>
           </Section>
 
