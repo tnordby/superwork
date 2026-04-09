@@ -21,7 +21,7 @@ export interface Workspace {
   name: string;
   owner_id: string;
   type: WorkspaceType;
-  settings: Record<string, any>;
+  settings: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -79,7 +79,7 @@ export interface Asset {
   category: string | null;
   folder: string | null;
   description: string | null;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   tags: string[];
   visibility: AssetVisibility;
   created_at: string;
@@ -212,7 +212,7 @@ export interface AssetShareRequest {
 export interface AssetBulkOperation {
   asset_ids: string[];
   operation: 'delete' | 'move' | 'tag' | 'share';
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 }
 
 // =============================================

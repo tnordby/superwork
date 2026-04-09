@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { PostgrestError } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import {
   getWorkspaceBudgetSnapshot,
@@ -20,6 +21,22 @@ const QUOTE_OPTIONAL_PRICING_COLUMNS = new Set([
   'value_confidence_score',
   'pricing_rationale',
 ]);
+
+const QUOTE_FIELDS_HIDDEN_FROM_CUSTOMER = [
+  'adjusted_hours',
+  'estimated_hours_low',
+  'estimated_hours_high',
+  'internal_hourly_rate',
+  'pass_through_costs',
+  'desired_margin_percent',
+  'certainty_buffer_percent',
+  'certainty_premium',
+  'value_adjustment',
+  'value_anchor_price',
+  'value_confidence_score',
+  'pricing_rationale',
+  'floor_price',
+] as const;
 
 function extractMissingQuotesColumn(errorMessage: string | undefined): string | null {
   if (!errorMessage) return null;
@@ -103,7 +120,9 @@ export async function GET(
       }));
     }
 
-    const quoteResponse = { ...quote };
+    const quoteResponse: Record<string, unknown> = {
+      ...(quote as unknown as Record<string, unknown>),
+    };
 
     if (
       quote.project_id &&
@@ -123,12 +142,12 @@ export async function GET(
           .select('first_name, last_name, email, company_name')
           .eq('id', projectOwner.user_id)
           .maybeSingle();
-        (quoteResponse as any).client_first_name =
+        quoteResponse['client_first_name'] =
           quote.client_first_name || ownerProfile?.first_name || null;
-        (quoteResponse as any).client_last_name =
+        quoteResponse['client_last_name'] =
           quote.client_last_name || ownerProfile?.last_name || null;
-        (quoteResponse as any).client_email = quote.client_email || ownerProfile?.email || null;
-        (quoteResponse as any).client_company_name =
+        quoteResponse['client_email'] = quote.client_email || ownerProfile?.email || null;
+        quoteResponse['client_company_name'] =
           quote.client_company_name || ownerProfile?.company_name || null;
       }
     }
@@ -140,25 +159,15 @@ export async function GET(
         .select('estimated_hours')
         .eq('name', quote.service_type)
         .maybeSingle();
-      (quoteResponse as any).baseline_hours = templateMatch?.estimated_hours ?? null;
+      quoteResponse['baseline_hours'] = templateMatch?.estimated_hours ?? null;
     }
 
     if (!isQuoteManager(platformRole)) {
-      delete (quoteResponse as any).adjusted_hours;
-      delete (quoteResponse as any).estimated_hours_low;
-      delete (quoteResponse as any).estimated_hours_high;
-      delete (quoteResponse as any).internal_hourly_rate;
-      delete (quoteResponse as any).pass_through_costs;
-      delete (quoteResponse as any).desired_margin_percent;
-      delete (quoteResponse as any).certainty_buffer_percent;
-      delete (quoteResponse as any).certainty_premium;
-      delete (quoteResponse as any).value_adjustment;
-      delete (quoteResponse as any).value_anchor_price;
-      delete (quoteResponse as any).value_confidence_score;
-      delete (quoteResponse as any).pricing_rationale;
-      delete (quoteResponse as any).floor_price;
-      quoteMilestones = quoteMilestones.map((m: any) => ({
-        ...m,
+      for (const key of QUOTE_FIELDS_HIDDEN_FROM_CUSTOMER) {
+        delete quoteResponse[key];
+      }
+      quoteMilestones = quoteMilestones.map((m) => ({
+        ...(m as Record<string, unknown>),
         estimated_hours: null,
       }));
     }
@@ -231,7 +240,7 @@ export async function PATCH(
     }
 
     // Build update object based on permissions and status
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     // Only PM/admin can update PM-specific fields
     if (isQuoteManager(platformRole)) {
@@ -351,7 +360,7 @@ export async function PATCH(
       updateData.assigned_lead_user_id !== null
     ) {
       const assigneeValidation = await validateQuoteAssignee(
-        updateData.assigned_lead_user_id
+        String(updateData.assigned_lead_user_id)
       );
       if (!assigneeValidation.ok) {
         return NextResponse.json(
@@ -362,9 +371,9 @@ export async function PATCH(
     }
 
     // Update quote (with graceful fallback if DB is behind on optional pricing columns)
-    let quote: any = null;
-    let updateError: any = null;
-    const safeUpdateData = { ...updateData };
+    let quote: Record<string, unknown> | null = null;
+    let updateError: PostgrestError | null = null;
+    const safeUpdateData: Record<string, unknown> = { ...updateData };
 
     while (true) {
       const { data, error } = await supabase
@@ -375,7 +384,7 @@ export async function PATCH(
         .single();
 
       if (!error) {
-        quote = data;
+        quote = data as Record<string, unknown>;
         break;
       }
 
@@ -396,17 +405,25 @@ export async function PATCH(
 
     if (isQuoteManager(platformRole) && Array.isArray(body.milestones)) {
       const milestones = body.milestones
-        .map((m: any, index: number) => ({
-          quote_id: id,
-          title: typeof m?.title === 'string' ? m.title.trim() : '',
-          description: typeof m?.description === 'string' ? m.description : null,
-          estimated_hours:
-            m?.estimated_hours !== undefined && m?.estimated_hours !== null
-              ? Number(m.estimated_hours)
-              : null,
-          order_index: index,
-        }))
-        .filter((m: any) => m.title.length > 0);
+        .map((raw: unknown, index: number) => {
+          const m =
+            raw && typeof raw === 'object' && raw !== null
+              ? (raw as Record<string, unknown>)
+              : {};
+          const title = typeof m.title === 'string' ? m.title.trim() : '';
+          const description = typeof m.description === 'string' ? m.description : null;
+          const eh = m.estimated_hours;
+          const estimated_hours =
+            eh !== undefined && eh !== null ? Number(eh) : null;
+          return {
+            quote_id: id,
+            title,
+            description,
+            estimated_hours,
+            order_index: index,
+          };
+        })
+        .filter((row: { title: string }) => row.title.length > 0);
 
       const { error: clearMilestonesError } = await supabase
         .from('quote_milestones')

@@ -40,6 +40,44 @@ type WorkspaceContractRow = {
   status: string;
 };
 
+type ClientWorkspaceListRow = {
+  id: string;
+  name: string | null;
+  owner_id: string;
+  type: string;
+  stripe_price_id: string | null;
+  stripe_subscription_status: string | null;
+  stripe_subscription_id: string | null;
+};
+
+type ProjectWorkspaceRow = { id: string; workspace_id: string };
+
+type WorkspaceMemberConsultantRow = {
+  workspace_id: string;
+  user_id: string;
+  role: string;
+};
+
+type QuoteLeadRow = {
+  project_id: string;
+  assigned_lead_user_id: string | null;
+  created_at: string;
+};
+
+type ProjectAssignmentRow = { project_id: string; user_id: string };
+
+type ProfileNameRow = { id: string; first_name: string | null; last_name: string | null };
+
+type PlatformRoleRow = { user_id: string; role: string };
+
+type PaidInvoiceRow = {
+  user_id: string | null;
+  amount: number | null;
+  status: string;
+  paid_at: string | null;
+  created_at: string;
+};
+
 function toDateOnly(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
@@ -106,13 +144,13 @@ export async function loadCustomersOverviewForWorkspace(
   const { data: workspaces, error: wsError } = await workspacesQuery;
   if (wsError) throw new Error(wsError.message);
 
-  const workspaceRows = workspaces ?? [];
+  const workspaceRows = (workspaces ?? []) as ClientWorkspaceListRow[];
   if (workspaceRows.length === 0) {
     return { rows: [], usedFallback };
   }
 
-  const ownerIds = Array.from(new Set(workspaceRows.map((w: any) => w.owner_id).filter(Boolean)));
-  const workspaceIds = workspaceRows.map((w: any) => w.id);
+  const ownerIds = Array.from(new Set(workspaceRows.map((w) => w.owner_id).filter(Boolean)));
+  const workspaceIds = workspaceRows.map((w) => w.id);
 
   const [{ data: ownerProfiles }, { data: memberRows }, { data: projectRows }, { data: roleRows }] =
     await Promise.all([
@@ -132,8 +170,9 @@ export async function loadCustomersOverviewForWorkspace(
     .in('workspace_id', workspaceIds)
     .eq('status', 'active');
 
-  const projectIds = (projectRows ?? []).map((p: any) => p.id);
-  const projectToWorkspace = new Map((projectRows ?? []).map((p: any) => [p.id, p.workspace_id]));
+  const projectList = (projectRows ?? []) as ProjectWorkspaceRow[];
+  const projectIds = projectList.map((p) => p.id);
+  const projectToWorkspace = new Map(projectList.map((p) => [p.id, p.workspace_id]));
 
   const [{ data: quoteRows }, { data: assignmentRows }, { data: memberProfiles }] = await Promise.all([
     projectIds.length > 0
@@ -143,37 +182,44 @@ export async function loadCustomersOverviewForWorkspace(
           .in('project_id', projectIds)
           .not('assigned_lead_user_id', 'is', null)
           .order('created_at', { ascending: false })
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve({ data: [] as QuoteLeadRow[] }),
     projectIds.length > 0
       ? db
           .from('project_assignments')
           .select('project_id, user_id, removed_at')
           .in('project_id', projectIds)
           .is('removed_at', null)
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve({ data: [] as ProjectAssignmentRow[] }),
     memberRows && memberRows.length > 0
       ? db
           .from('profiles')
           .select('id, first_name, last_name')
           .in(
             'id',
-            Array.from(new Set((memberRows ?? []).map((m: any) => m.user_id).filter(Boolean)))
+            Array.from(
+              new Set(
+                (memberRows as WorkspaceMemberConsultantRow[]).map((m) => m.user_id).filter(Boolean)
+              )
+            )
           )
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve({ data: [] as ProfileNameRow[] }),
   ]);
 
+  const ownerProfileRows = (ownerProfiles ?? []) as ProfileNameRow[];
   const ownerNameById = new Map(
-    (ownerProfiles ?? []).map((p: any) => [p.id, displayName(p.first_name, p.last_name)])
+    ownerProfileRows.map((p) => [p.id, displayName(p.first_name, p.last_name)])
   );
+  const memberProfileRows = (memberProfiles ?? []) as ProfileNameRow[];
   const profileNameById = new Map(
-    (memberProfiles ?? []).map((p: any) => [p.id, displayName(p.first_name, p.last_name)])
+    memberProfileRows.map((p) => [p.id, displayName(p.first_name, p.last_name)])
   );
-  const roleByUserId = new Map((roleRows ?? []).map((r: any) => [r.user_id, r.role]));
+  const platformRoleRows = (roleRows ?? []) as PlatformRoleRow[];
+  const roleByUserId = new Map(platformRoleRows.map((r) => [r.user_id, r.role]));
 
   const pmByWorkspaceId = new Map<string, string>();
-  for (const row of quoteRows ?? []) {
-    const workspaceId = projectToWorkspace.get((row as any).project_id);
-    const leadId = (row as any).assigned_lead_user_id as string | null;
+  for (const row of (quoteRows ?? []) as QuoteLeadRow[]) {
+    const workspaceId = projectToWorkspace.get(row.project_id);
+    const leadId = row.assigned_lead_user_id;
     if (!workspaceId || !leadId || pmByWorkspaceId.has(workspaceId)) continue;
     const role = roleByUserId.get(leadId);
     if (role === 'project_manager' || role === 'pm' || role === 'admin') {
@@ -182,9 +228,9 @@ export async function loadCustomersOverviewForWorkspace(
   }
 
   const consultantsByWorkspaceId = new Map<string, Set<string>>();
-  for (const row of assignmentRows ?? []) {
-    const workspaceId = projectToWorkspace.get((row as any).project_id);
-    const consultantId = (row as any).user_id as string | null;
+  for (const row of (assignmentRows ?? []) as ProjectAssignmentRow[]) {
+    const workspaceId = projectToWorkspace.get(row.project_id);
+    const consultantId = row.user_id;
     if (!workspaceId || !consultantId) continue;
     const role = roleByUserId.get(consultantId);
     if (role !== 'consultant') continue;
@@ -197,7 +243,7 @@ export async function loadCustomersOverviewForWorkspace(
   const stripePriceIds = Array.from(
     new Set(
       workspaceRows
-        .map((w: any) => (w.stripe_subscription_status === 'active' ? w.stripe_price_id : null))
+        .map((w) => (w.stripe_subscription_status === 'active' ? w.stripe_price_id : null))
         .filter(Boolean)
     )
   ) as string[];
@@ -230,8 +276,8 @@ export async function loadCustomersOverviewForWorkspace(
     .gte('created_at', ninetyDaysAgoIso);
 
   if (!invoiceError && invoiceRows) {
-    for (const invoice of invoiceRows as any[]) {
-      const ownerId = invoice.user_id as string | null;
+    for (const invoice of invoiceRows as PaidInvoiceRow[]) {
+      const ownerId = invoice.user_id;
       if (!ownerId) continue;
       const current = manualMrrByOwnerId.get(ownerId) ?? 0;
       manualMrrByOwnerId.set(ownerId, current + Number(invoice.amount || 0) / 3);
@@ -274,7 +320,7 @@ export async function loadCustomersOverviewForWorkspace(
     }
   }
 
-  const rows: CustomerOverviewRow[] = workspaceRows.map((workspace: any) => {
+  const rows: CustomerOverviewRow[] = workspaceRows.map((workspace) => {
     const stripeMrr =
       workspace.stripe_subscription_status === 'active' && workspace.stripe_price_id
         ? mrrByPriceId.get(workspace.stripe_price_id) ?? 0

@@ -20,7 +20,7 @@ export type EmailLogData = {
   status: 'sent' | 'failed' | 'bounced';
   externalId?: string;
   errorMessage?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 /**

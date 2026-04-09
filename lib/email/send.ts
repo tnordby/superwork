@@ -6,7 +6,7 @@ interface SendEmailParams {
   subject: string;
   template: React.ReactElement;
   templateId: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   retries?: number;
 }
 
