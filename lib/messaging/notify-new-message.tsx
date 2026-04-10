@@ -2,6 +2,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import NewInboxMessageEmail from '@/emails/NewInboxMessageEmail';
 import { sendEmail } from '@/lib/email/send';
 import { uniqueEmailsPreservingCase } from '@/lib/messaging/unique-emails';
+import {
+  fingerprintInboxPreview,
+  inboxNotifyAlreadyLoggedForMessage,
+  inboxNotifyDuplicateContentRecently,
+} from '@/lib/messaging/inbox-email-dedup';
 import { tryCreateServiceRoleClient } from '@/lib/supabase/admin';
 
 function appBaseUrl(): string {
@@ -24,6 +29,7 @@ async function loadProfileEmails(admin: SupabaseClient, userIds: string[]) {
 }
 
 export type NotifyNewInboxMessageParams = {
+  messageId: string;
   conversationId: string;
   projectId: string;
   customerUserId: string;
@@ -36,6 +42,8 @@ export type NotifyNewInboxMessageParams = {
 /**
  * Best-effort email to the other party on the thread. Does not throw to callers.
  * Requires RESEND_API_KEY; uses the service role client when SUPABASE_SERVICE_ROLE_KEY is configured.
+ * Skips duplicate sends for the same messageId (logged in email_logs) and suppresses rapid
+ * duplicate content from the same sender to the same recipient in one thread (double submit).
  */
 export async function notifyNewInboxMessage(params: NotifyNewInboxMessageParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) return;
@@ -56,6 +64,7 @@ export async function notifyNewInboxMessage(params: NotifyNewInboxMessageParams)
     const inboxUrl = `${appBaseUrl()}/inbox`;
     const preview =
       params.preview.length > 280 ? `${params.preview.slice(0, 277).trimEnd()}…` : params.preview;
+    const previewFingerprint = fingerprintInboxPreview(preview);
 
     const senderEmails = await loadProfileEmails(admin, [params.senderUserId]);
     const senderEmail = senderEmails[0] ?? null;
@@ -82,8 +91,22 @@ export async function notifyNewInboxMessage(params: NotifyNewInboxMessageParams)
     );
 
     await Promise.all(
-      filtered.map((to) =>
-        sendEmail({
+      filtered.map(async (to) => {
+        if (await inboxNotifyAlreadyLoggedForMessage(admin, params.messageId, to)) {
+          return;
+        }
+        if (
+          await inboxNotifyDuplicateContentRecently(
+            admin,
+            params.conversationId,
+            to,
+            params.senderUserId,
+            previewFingerprint
+          )
+        ) {
+          return;
+        }
+        await sendEmail({
           to,
           subject: `New message: ${projectName}`,
           template: (
@@ -97,13 +120,15 @@ export async function notifyNewInboxMessage(params: NotifyNewInboxMessageParams)
           ),
           templateId: 'new_inbox_message',
           metadata: {
+            messageId: params.messageId,
             conversationId: params.conversationId,
             projectId: params.projectId,
             senderUserId: params.senderUserId,
             isFromCustomer: params.isFromCustomer,
+            previewFingerprint,
           },
-        })
-      )
+        });
+      })
     );
   } catch (e) {
     console.error('[notifyNewInboxMessage] failed:', e);

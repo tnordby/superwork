@@ -171,6 +171,7 @@ export async function POST(
       .eq('id', conversationId);
 
     const payload = {
+      messageId: String(created.id),
       conversationId,
       projectId: String(conversation.project_id),
       customerUserId: String(conversation.user_id),
