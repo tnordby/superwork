@@ -11,6 +11,7 @@ import {
   readSelectedWorkspaceIdFromRequest,
   resolveInternalWriteWorkspaceId,
 } from '@/lib/internal/client-context';
+import { customerCanFilterAssetsByProject } from '@/lib/assets/customer-access';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const BUCKET_NAME = 'shared-assets';
@@ -66,7 +67,11 @@ export async function POST(request: NextRequest) {
     const effectiveWorkspaceId = isInternalStaff(platformRole)
       ? writeWorkspaceResolution.workspaceId
       : workspace_id;
-    const project_id = formData.get('project_id') as string | null;
+    const project_id_raw = formData.get('project_id');
+    const project_id =
+      typeof project_id_raw === 'string' && project_id_raw.trim() !== ''
+        ? project_id_raw.trim()
+        : null;
     const category = formData.get('category') as string | null;
     const folder = formData.get('folder') as string | null;
     const description = formData.get('description') as string | null;
@@ -117,6 +122,34 @@ export async function POST(request: NextRequest) {
           { error: 'Access denied to this workspace' },
           { status: 403 }
         );
+      }
+    }
+
+    if (project_id) {
+      if (!isInternalStaff(platformRole)) {
+        const allowed = await customerCanFilterAssetsByProject(supabase, user.id, project_id);
+        if (!allowed) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+      }
+
+      const { data: projectRow } = await supabase
+        .from('projects')
+        .select('workspace_id')
+        .eq('id', project_id)
+        .maybeSingle();
+
+      if (!projectRow) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      }
+
+      if (projectRow.workspace_id) {
+        if (!effectiveWorkspaceId || projectRow.workspace_id !== effectiveWorkspaceId) {
+          return NextResponse.json(
+            { error: 'Project does not belong to the selected workspace' },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -188,7 +221,7 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         workspace_id: effectiveWorkspaceId || null,
-        project_id: project_id || null,
+        project_id: project_id,
         name: originalName,
         file_type: fileType,
         file_extension: fileExtension,

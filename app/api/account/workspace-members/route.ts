@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createServiceRoleClient } from '@/lib/supabase/admin';
+import { resolveCustomerWorkspaceContext } from '@/lib/account/customer-workspace-context';
 
 type WorkspaceMembershipRole = 'owner' | 'admin' | 'member' | 'consultant' | 'client' | 'viewer';
 
@@ -44,64 +44,6 @@ function normalizeEmail(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
-async function resolveUserWorkspaceContext(userId: string) {
-  const admin = createServiceRoleClient();
-
-  const { data: ownedWorkspace, error: ownedError } = await admin
-    .from('workspaces')
-    .select('id, owner_id, name')
-    .eq('owner_id', userId)
-    .eq('type', 'client')
-    .order('created_at', { ascending: true })
-    .maybeSingle();
-
-  if (ownedError) {
-    return { error: ownedError.message, status: 500 as const };
-  }
-
-  if (ownedWorkspace) {
-    return {
-      workspace: ownedWorkspace,
-      actorRole: 'owner' as const,
-      isOwner: true,
-      canManageMembers: true,
-      admin,
-    };
-  }
-
-  const { data: memberWorkspace, error: memberError } = await admin
-    .from('workspace_members')
-    .select('workspace_id, role, workspaces!inner(id, owner_id, name, type)')
-    .eq('user_id', userId)
-    .eq('workspaces.type', 'client')
-    .order('invited_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (memberError) {
-    return { error: memberError.message, status: 500 as const };
-  }
-
-  if (!memberWorkspace || !memberWorkspace.workspaces) {
-    return { error: 'Workspace not found', status: 404 as const };
-  }
-
-  const workspace = Array.isArray(memberWorkspace.workspaces)
-    ? memberWorkspace.workspaces[0]
-    : memberWorkspace.workspaces;
-
-  const actorRole = (memberWorkspace.role || 'member') as WorkspaceMembershipRole;
-  const canManageMembers = actorRole === 'owner' || actorRole === 'admin';
-
-  return {
-    workspace,
-    actorRole,
-    isOwner: false,
-    canManageMembers,
-    admin,
-  };
-}
-
 export async function GET() {
   try {
     const supabase = await createClient();
@@ -114,7 +56,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const context = await resolveUserWorkspaceContext(user.id);
+    const context = await resolveCustomerWorkspaceContext(user.id);
     if ('error' in context) {
       return NextResponse.json({ error: context.error }, { status: context.status });
     }
@@ -175,7 +117,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const context = await resolveUserWorkspaceContext(user.id);
+    const context = await resolveCustomerWorkspaceContext(user.id);
     if ('error' in context) {
       return NextResponse.json({ error: context.error }, { status: context.status });
     }

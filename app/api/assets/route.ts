@@ -3,16 +3,11 @@ import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff } from '@/lib/auth/platform-role';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
-
-/** PostgREST `.or()` splits on commas; LIKE treats `%`/`_` as wildcards — normalize for safe filters. */
-function sanitizeAssetSearchInput(raw: string): string {
-  return raw
-    .replace(/,/g, ' ')
-    .replace(/%/g, '')
-    .replace(/_/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+import { sanitizeAssetSearchInput } from '@/lib/assets/asset-query';
+import {
+  customerCanFilterAssetsByProject,
+  customerHasWorkspaceAccess,
+} from '@/lib/assets/customer-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,11 +42,29 @@ export async function GET(request: NextRequest) {
     // 3. Build query (no aggregate count — avoids PostgREST/RLS issues; UI lists current page only)
     let query = supabase.from('assets').select('*').order('created_at', { ascending: false });
 
-    // Apply filters
-    if (isInternalStaff(platformRole) && selectedWorkspaceId) {
-      query = query.eq('workspace_id', selectedWorkspaceId);
-    } else if (workspace_id) {
-      query = query.eq('workspace_id', workspace_id);
+    if (!isInternalStaff(platformRole) && workspace_id) {
+      const allowed = await customerHasWorkspaceAccess(supabase, user.id, workspace_id);
+      if (!allowed) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    if (!isInternalStaff(platformRole) && project_id) {
+      const allowedProject = await customerCanFilterAssetsByProject(
+        supabase,
+        user.id,
+        project_id
+      );
+      if (!allowedProject) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    const scopedWorkspaceId = isInternalStaff(platformRole)
+      ? workspace_id ?? selectedWorkspaceId
+      : workspace_id;
+    if (scopedWorkspaceId) {
+      query = query.eq('workspace_id', scopedWorkspaceId);
     }
 
     if (project_id) {

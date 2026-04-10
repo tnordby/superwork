@@ -24,6 +24,8 @@ export interface Project {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  workspace_id?: string | null;
+  team_id?: string | null;
 }
 
 // Database insert type (what we send when creating)
@@ -49,6 +51,8 @@ export interface ProjectUpdate {
   due_date?: string;
   started_at?: string;
   completed_at?: string;
+  /** Must belong to the same workspace as the project */
+  team_id?: string | null;
 }
 
 // Project with additional UI state

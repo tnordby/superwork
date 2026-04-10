@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Inbox, Briefcase, ClipboardList } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
-import { isQuoteManager } from '@/lib/auth/platform-role';
+import { isInternalStaff, isQuoteManager } from '@/lib/auth/platform-role';
 import { readSelectedWorkspaceIdFromServerCookies } from '@/lib/internal/client-context';
 
 export const dynamic = 'force-dynamic';
@@ -36,6 +36,17 @@ export default async function TeamHomePage() {
       {selectedWorkspaceName && (
         <div className="mt-4 inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700">
           Viewing: {selectedWorkspaceName}
+        </div>
+      )}
+
+      {role && isInternalStaff(role) && !selectedWorkspaceId && (
+        <div className="mt-4 max-w-xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-medium">No client selected</p>
+          <p className="mt-1 text-amber-900/90">
+            Use the client switcher in the sidebar to scope quotes, projects, and customer data to one
+            organization. “All clients” is fine for browsing; pick a client when you need a single-workspace
+            context.
+          </p>
         </div>
       )}
 

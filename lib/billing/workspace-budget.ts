@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getTotalAmountPaidForSubscription } from '@/lib/stripe/helpers';
 import { sumCommittedBalanceCents, sumUsedBalanceCents, type ProjectCostRow } from './project-balances';
 
 export type WorkspaceBudgetSnapshot = {
@@ -47,6 +46,7 @@ export async function getWorkspaceBudgetSnapshot(
   const subscriptionId = workspace?.stripe_subscription_id;
   if (subscriptionId && process.env.STRIPE_SECRET_KEY) {
     try {
+      const { getTotalAmountPaidForSubscription } = await import('@/lib/stripe/helpers');
       const paid = await getTotalAmountPaidForSubscription(subscriptionId);
       if (paid.totalCents > 0) {
         totalPurchasedCents = paid.totalCents;

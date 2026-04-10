@@ -7,6 +7,7 @@ import { sumCommittedBalanceCents, sumUsedBalanceCents } from '@/lib/billing/pro
 import { formatAmount, formatBillingInterval, formatSubscriptionStatus } from '@/lib/stripe/utils';
 import { createClient } from '@/lib/supabase/client';
 import { SubscriptionBanner } from '@/components/billing/SubscriptionBanner';
+import { StripeMark } from '@/components/billing/StripeMark';
 
 interface Workspace {
   id: string;
@@ -314,6 +315,9 @@ export default function PlanPage() {
   const status = formatSubscriptionStatus(workspace?.stripe_subscription_status);
   const hasActiveSubscription = workspace?.stripe_subscription_status &&
     ['active', 'trialing'].includes(workspace.stripe_subscription_status);
+  const billingViaStripe = Boolean(
+    workspace?.stripe_subscription_id || workspace?.stripe_customer_id
+  );
 
   // Calculate balances
   const startingBalance = subscriptionData?.amount || 0;
@@ -322,7 +326,19 @@ export default function PlanPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-semibold text-gray-900 mb-8">Plan & Billing</h1>
+      <div className="mb-8">
+        <h1 className="text-3xl font-semibold text-gray-900">Plan & Billing</h1>
+        {billingViaStripe && hasActiveSubscription ? (
+          <p className="mt-2 text-sm leading-relaxed text-gray-600">
+            Your subscription and payments are processed securely through{' '}
+            <span className="inline-flex items-center gap-1.5 align-middle font-medium text-gray-900">
+              <StripeMark className="h-[1.05em] w-[1.05em] shrink-0 text-[#635BFF]" aria-hidden />
+              <span className="leading-none">Stripe</span>
+            </span>
+            . Invoices, payment methods, and receipts are managed in your Stripe billing portal.
+          </p>
+        ) : null}
+      </div>
       {pageError && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {pageError}
@@ -349,6 +365,11 @@ export default function PlanPage() {
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">Current Plan</h2>
                 <p className="text-gray-600">
                   {formatBillingInterval(workspace?.subscription_interval)} billing
+                  {billingViaStripe ? (
+                    <span className="mt-1 block text-sm text-gray-500">
+                      Billed via Stripe — same plan and renewal rules as in your Stripe subscription.
+                    </span>
+                  ) : null}
                 </p>
               </div>
               <span className={`inline-block rounded-full px-4 py-2 text-sm font-medium ${
@@ -363,13 +384,13 @@ export default function PlanPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className="flex items-start gap-4">
-                <div className="rounded-xl bg-gray-100 p-3">
-                  <Calendar className="h-6 w-6 text-gray-700" />
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100">
+                  <Calendar className="h-6 w-6 text-gray-700" aria-hidden />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm text-gray-600 mb-1">Next billing date</p>
-                  <p className="text-lg font-semibold text-gray-900">
+                  <p className="text-lg font-semibold text-gray-900 leading-snug">
                     {workspace?.current_period_end
                       ? new Date(workspace.current_period_end).toLocaleDateString('en-US', {
                           month: 'long',
@@ -381,13 +402,25 @@ export default function PlanPage() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-4">
-                <div className="rounded-xl bg-gray-100 p-3">
-                  <CreditCard className="h-6 w-6 text-gray-700" />
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100">
+                  <CreditCard className="h-6 w-6 text-gray-700" aria-hidden />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm text-gray-600 mb-1">Payment method</p>
-                  <p className="text-lg font-semibold text-gray-900">On file</p>
+                  <p className="text-lg font-semibold text-gray-900 leading-snug">
+                    {billingViaStripe ? (
+                      <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 align-middle">
+                        <span>On file in</span>
+                        <span className="inline-flex items-center gap-1">
+                          <StripeMark className="h-[1.1em] w-[1.1em] shrink-0 text-[#635BFF]" aria-hidden />
+                          <span className="leading-none">Stripe</span>
+                        </span>
+                      </span>
+                    ) : (
+                      'On file'
+                    )}
+                  </p>
                 </div>
               </div>
             </div>
@@ -395,19 +428,26 @@ export default function PlanPage() {
             <button
               onClick={handleManageBilling}
               disabled={managingBilling}
-              className="w-full rounded-xl bg-gray-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-gray-900 px-6 py-3 text-sm font-medium leading-none text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {managingBilling ? 'Opening...' : 'Manage Billing'}
+              {billingViaStripe ? (
+                <StripeMark className="h-[1.125rem] w-[1.125rem] shrink-0 text-white" aria-hidden />
+              ) : null}
+              {managingBilling
+                ? 'Opening...'
+                : billingViaStripe
+                  ? 'Manage Billing (Stripe)'
+                  : 'Manage Billing'}
             </button>
           </div>
 
           {/* Balance & Usage */}
           <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
-              <div className="rounded-xl bg-gray-900 p-2">
-                <span className="text-white text-lg font-bold">$</span>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-900">
+                <span className="text-sm font-bold leading-none text-white">$</span>
               </div>
-              <h2 className="text-xl font-semibold text-gray-900">Budget Overview</h2>
+              <h2 className="text-xl font-semibold leading-snug text-gray-900">Budget Overview</h2>
             </div>
 
             <div className="space-y-4">
@@ -505,6 +545,9 @@ export default function PlanPage() {
           {/* Available Plans */}
           {plans.length > 0 && (
             <div>
+              <p className="mb-8 text-center text-sm text-gray-500">
+                Checkout and subscription billing are processed securely through Stripe.
+              </p>
               <div className="text-center mb-12">
                 <h2 className="text-4xl font-bold text-gray-900 mb-4">
                   A subscription built to <span className="italic">fuel your growth</span>

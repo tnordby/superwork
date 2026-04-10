@@ -6,7 +6,7 @@ import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-contex
 
 const BUCKET_NAME = 'shared-assets';
 
-// GET single asset
+// GET single asset (PATCH/DELETE still enforce client context for internal users where applicable)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -36,28 +36,24 @@ export async function GET(
       return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
     }
 
-    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
-    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
-    if (
-      isInternalStaff(platformRole) &&
-      selectedWorkspaceId &&
-      asset.workspace_id &&
-      asset.workspace_id !== selectedWorkspaceId
-    ) {
-      return NextResponse.json(
-        { error: 'Asset is outside selected client context' },
-        { status: 403 }
-      );
-    }
+    // Internal staff may open any asset the database allows (RLS); client context does not restrict reads.
 
-    // 3. Get signed URL for download
-    const { data: signedUrlData } = await supabase.storage
+    // 3. Get signed URL for download (storage RLS must match DB read access; fail loudly if not)
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from(BUCKET_NAME)
       .createSignedUrl(asset.storage_path, 3600); // 1 hour expiry
 
+    if (signedUrlError || !signedUrlData?.signedUrl) {
+      console.error('Asset GET signed URL error:', signedUrlError);
+      return NextResponse.json(
+        { error: 'Failed to generate download URL' },
+        { status: 500 }
+      );
+    }
+
     const assetWithUrl = {
       ...asset,
-      download_url: signedUrlData?.signedUrl,
+      download_url: signedUrlData.signedUrl,
     };
 
     return NextResponse.json({ asset: assetWithUrl }, { status: 200 });

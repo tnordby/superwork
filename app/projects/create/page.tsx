@@ -4,6 +4,8 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
+import { isInternalStaff } from '@/lib/auth/platform-role';
 import MarketingHubForm from './MarketingHubForm';
 import DynamicIntakeForm, { type IntakeResponseMap } from './DynamicIntakeForm';
 
@@ -54,6 +56,10 @@ function CreateProjectForm() {
   const [templateLoading, setTemplateLoading] = useState(false);
   const [intakeResponses, setIntakeResponses] = useState<IntakeResponseMap | null>(null);
   const [hasIntakeForm, setHasIntakeForm] = useState(false);
+  const [workspaceTeams, setWorkspaceTeams] = useState<{ id: string; name: string }[]>([]);
+  const [teamIdForProject, setTeamIdForProject] = useState('');
+  const { platformRole } = useAuth();
+  const [internalSelectedWorkspaceId, setInternalSelectedWorkspaceId] = useState<string | null>(null);
 
   // Fetch service template if templateId is provided
   useEffect(() => {
@@ -118,6 +124,56 @@ function CreateProjectForm() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/internal/selected-workspace', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const id =
+          typeof data.workspace_id === 'string' && data.workspace_id.trim() ? data.workspace_id.trim() : null;
+        setInternalSelectedWorkspaceId(id);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (platformRole === null) return;
+    let cancelled = false;
+    const internal = isInternalStaff(platformRole);
+
+    const run = async () => {
+      let url: string | null = null;
+      if (internal) {
+        if (!internalSelectedWorkspaceId) {
+          if (!cancelled) setWorkspaceTeams([]);
+          return;
+        }
+        url = `/api/internal/workspace-teams?workspace_id=${encodeURIComponent(internalSelectedWorkspaceId)}`;
+      } else {
+        url = '/api/account/workspace-teams';
+      }
+      try {
+        const res = await fetch(url, { credentials: 'include' });
+        const data = res.ok ? await res.json() : null;
+        if (cancelled || !data?.teams || !Array.isArray(data.teams)) return;
+        setWorkspaceTeams(
+          data.teams.map((t: { id: string; name: string }) => ({ id: t.id, name: t.name }))
+        );
+      } catch {
+        if (!cancelled) setWorkspaceTeams([]);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [platformRole, internalSelectedWorkspaceId]);
+
   // Format dynamic intake form responses into markdown description
   type IntakeFieldDef = { field_name: string; label: string; field_type?: string };
 
@@ -175,6 +231,9 @@ function CreateProjectForm() {
       if (templateId) {
         payload.service_template_id = templateId;
       }
+      if (teamIdForProject.trim()) {
+        payload.team_id = teamIdForProject.trim();
+      }
 
       const response = await fetch('/api/projects', {
         method: 'POST',
@@ -226,6 +285,9 @@ function CreateProjectForm() {
       // If we have a template, include the template ID
       if (templateId) {
         payload.service_template_id = templateId;
+      }
+      if (teamIdForProject.trim()) {
+        payload.team_id = teamIdForProject.trim();
       }
 
       // For HubSpot Marketing Hub, format the description with form data
@@ -485,6 +547,37 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
             <p className="text-sm text-red-800">{error}</p>
           </div>
         )}
+
+        {(workspaceTeams.length > 0 ||
+          (platformRole !== null &&
+            isInternalStaff(platformRole) &&
+            internalSelectedWorkspaceId)) ? (
+          <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <label htmlFor="create-project-team" className="block text-sm font-medium text-gray-900">
+              Team (optional)
+            </label>
+            <p className="mt-1 text-xs text-gray-600 mb-2">
+              Attribute this project to a team so spend shows under that team&apos;s budget on{' '}
+              <Link href="/account/teams" className="underline underline-offset-2 text-gray-900">
+                Teams
+              </Link>
+              .
+            </p>
+            <select
+              id="create-project-team"
+              value={teamIdForProject}
+              onChange={(e) => setTeamIdForProject(e.target.value)}
+              className="w-full max-w-md rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">No team</option>
+              {workspaceTeams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
 
         {(() => {
           console.log('🔍 Rendering form. serviceTemplate:', serviceTemplate);

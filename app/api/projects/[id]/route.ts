@@ -4,9 +4,11 @@ import type { ProjectUpdate } from '@/types/projects';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff } from '@/lib/auth/platform-role';
 import type { PlatformRole } from '@/lib/auth/platform-role';
+import { validateTeamBelongsToWorkspace } from '@/lib/account/validate-workspace-team';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 import { getWorkspaceBudgetSnapshot } from '@/lib/billing/workspace-budget';
 import { ensureConversationWhenProjectStarts } from '@/lib/messaging/project-start-conversation';
+import { tryCreateServiceRoleClient } from '@/lib/supabase/admin';
 
 async function loadProjectWithAccessScope(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -48,7 +50,7 @@ export async function GET(
     const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
     if (isInternalStaff(platformRole) && !selectedWorkspaceId) {
       return NextResponse.json(
-        { error: 'Select a client context before updating projects.' },
+        { error: 'Select a client context before viewing this project.' },
         { status: 400 }
       );
     }
@@ -99,7 +101,7 @@ export async function PATCH(
     const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
     if (isInternalStaff(platformRole) && !selectedWorkspaceId) {
       return NextResponse.json(
-        { error: 'Select a client context before deleting projects.' },
+        { error: 'Select a client context before updating projects.' },
         { status: 400 }
       );
     }
@@ -126,6 +128,15 @@ export async function PATCH(
     if (body.progress !== undefined) updateData.progress = body.progress;
     if (body.assignee !== undefined) updateData.assignee = body.assignee;
     if (body.due_date !== undefined) updateData.due_date = body.due_date;
+    if (body.team_id !== undefined) {
+      const raw = body.team_id;
+      updateData.team_id =
+        raw === null || raw === ''
+          ? null
+          : typeof raw === 'string'
+            ? raw.trim() || null
+            : null;
+    }
 
     const { data: existingProject, error: existingProjectError } = await loadProjectWithAccessScope(
       supabase,
@@ -138,7 +149,32 @@ export async function PATCH(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    const STARTED_STATUSES = new Set(['in_progress', 'in_review', 'on_hold', 'completed']);
+    if (updateData.team_id !== undefined) {
+      const nextTeamId = updateData.team_id;
+      if (nextTeamId) {
+        const wsId =
+          typeof existingProject.workspace_id === 'string' ? existingProject.workspace_id : null;
+        if (!wsId) {
+          return NextResponse.json(
+            { error: 'A team can only be assigned when the project belongs to a workspace.' },
+            { status: 400 }
+          );
+        }
+        const admin = tryCreateServiceRoleClient();
+        if (!admin) {
+          return NextResponse.json(
+            { error: 'Server configuration prevents validating team assignment.' },
+            { status: 503 }
+          );
+        }
+        const v = await validateTeamBelongsToWorkspace(admin, nextTeamId, wsId);
+        if (!v.ok) {
+          return NextResponse.json({ error: v.message }, { status: 400 });
+        }
+      }
+    }
+
+    const STARTED_STATUSES = new Set(['in_progress', 'in_review', 'on_hold', 'completed', 'review']);
     const previousStatus = existingProject.status as string;
     const nextStatus = (updateData.status ?? previousStatus) as string;
     const projectCostCents = Number(existingProject.cost ?? 0);

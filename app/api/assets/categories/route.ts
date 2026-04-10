@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff } from '@/lib/auth/platform-role';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
+import { customerHasWorkspaceAccess } from '@/lib/assets/customer-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,21 +24,15 @@ export async function GET(request: NextRequest) {
     // 2. Parse query parameters
     const searchParams = request.nextUrl.searchParams;
     const requestedWorkspaceId = searchParams.get('workspace_id');
-    const workspaceId =
-      isInternalStaff(platformRole) && selectedWorkspaceId
-        ? selectedWorkspaceId
-        : requestedWorkspaceId;
+    const workspaceId = isInternalStaff(platformRole)
+      ? requestedWorkspaceId ?? selectedWorkspaceId
+      : requestedWorkspaceId;
 
-    if (
-      isInternalStaff(platformRole) &&
-      selectedWorkspaceId &&
-      requestedWorkspaceId &&
-      requestedWorkspaceId !== selectedWorkspaceId
-    ) {
-      return NextResponse.json(
-        { error: 'Requested workspace is outside selected client context' },
-        { status: 403 }
-      );
+    if (!isInternalStaff(platformRole) && workspaceId) {
+      const allowed = await customerHasWorkspaceAccess(supabase, user.id, workspaceId);
+      if (!allowed) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     if (!workspaceId) {

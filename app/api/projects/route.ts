@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { resolveCustomerWorkspaceContext } from '@/lib/account/customer-workspace-context';
+import { validateTeamBelongsToWorkspace } from '@/lib/account/validate-workspace-team';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff } from '@/lib/auth/platform-role';
 import {
   readSelectedWorkspaceIdFromRequest,
   resolveInternalWriteWorkspaceId,
 } from '@/lib/internal/client-context';
+import { tryCreateServiceRoleClient } from '@/lib/supabase/admin';
 
 // GET - Fetch all projects for the logged-in user
 export async function GET(request: NextRequest) {
@@ -67,7 +70,8 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { name, description, category, service_type, service_template_id, workspace_id } = body;
+    const { name, description, category, service_type, service_template_id, workspace_id, team_id } =
+      body;
 
     if (!name || !category || !service_type) {
       return NextResponse.json(
@@ -101,19 +105,81 @@ export async function POST(request: NextRequest) {
       if (!workspaceInContext) {
         return NextResponse.json({ error: 'Client workspace not found' }, { status: 400 });
       }
-    } else {
-      const { data: workspace } = await supabase
-        .from('workspaces')
-        .select('id')
-        .eq('owner_id', user.id)
+      const requestedTeamId =
+        typeof team_id === 'string' && team_id.trim() ? team_id.trim() : null;
+      const admin = tryCreateServiceRoleClient();
+      if (requestedTeamId && workspaceId && !admin) {
+        return NextResponse.json(
+          { error: 'Server configuration prevents validating team assignment.' },
+          { status: 503 }
+        );
+      }
+      if (requestedTeamId && workspaceId && admin) {
+        const v = await validateTeamBelongsToWorkspace(admin, requestedTeamId, workspaceId);
+        if (!v.ok) {
+          return NextResponse.json({ error: v.message }, { status: 400 });
+        }
+      }
+
+      const projectData: Record<string, unknown> = {
+        user_id: user.id,
+        workspace_id: workspaceId,
+        name,
+        description: description || null,
+        category,
+        service_type,
+        status: 'planned',
+        progress: 0,
+      };
+      if (requestedTeamId) {
+        projectData.team_id = requestedTeamId;
+      }
+      if (service_template_id) {
+        projectData.service_template_id = service_template_id;
+      }
+
+      const { data: project, error } = await supabase
+        .from('projects')
+        .insert(projectData)
+        .select()
         .single();
-      workspaceId = workspace?.id ?? null;
+
+      if (error) {
+        console.error('Error creating project:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      if (service_template_id && project) {
+        try {
+          await supabase.rpc('instantiate_project_from_template', {
+            project_id_param: project.id,
+            service_template_id_param: service_template_id,
+          });
+        } catch (instantiateError) {
+          console.error('Error instantiating project from template:', instantiateError);
+        }
+      }
+
+      return NextResponse.json({ project }, { status: 201 });
     }
 
-    // Create project
+    const ctx = await resolveCustomerWorkspaceContext(user.id);
+    if ('error' in ctx) {
+      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+    }
+
+    const { workspace, admin } = ctx;
+    const requestedTeamId = typeof team_id === 'string' && team_id.trim() ? team_id.trim() : null;
+    if (requestedTeamId) {
+      const v = await validateTeamBelongsToWorkspace(admin, requestedTeamId, workspace.id);
+      if (!v.ok) {
+        return NextResponse.json({ error: v.message }, { status: 400 });
+      }
+    }
+
     const projectData: Record<string, unknown> = {
       user_id: user.id,
-      workspace_id: workspaceId,
+      workspace_id: workspace.id,
       name,
       description: description || null,
       category,
@@ -121,33 +187,28 @@ export async function POST(request: NextRequest) {
       status: 'planned',
       progress: 0,
     };
-
-    // Add service_template_id if provided
+    if (requestedTeamId) {
+      projectData.team_id = requestedTeamId;
+    }
     if (service_template_id) {
       projectData.service_template_id = service_template_id;
     }
 
-    const { data: project, error } = await supabase
-      .from('projects')
-      .insert(projectData)
-      .select()
-      .single();
+    const { data: project, error } = await admin.from('projects').insert(projectData).select().single();
 
     if (error) {
       console.error('Error creating project:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // If service_template_id is provided, instantiate SOPs and tasks
     if (service_template_id && project) {
       try {
-        await supabase.rpc('instantiate_project_from_template', {
+        await admin.rpc('instantiate_project_from_template', {
           project_id_param: project.id,
           service_template_id_param: service_template_id,
         });
       } catch (instantiateError) {
         console.error('Error instantiating project from template:', instantiateError);
-        // Continue anyway - project is created, just without template tasks
       }
     }
 

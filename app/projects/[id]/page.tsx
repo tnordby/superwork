@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/components/AuthProvider';
+import { isInternalStaff } from '@/lib/auth/platform-role';
 import {
   ArrowLeft,
   Clock,
@@ -26,6 +28,8 @@ import {
   X,
 } from 'lucide-react';
 import type { Project, ProjectStatus } from '@/types/projects';
+
+type ProjectWithWorkspace = Project & { workspace_id?: string | null; team_id?: string | null };
 import type { Milestone, Task } from '@/types/milestones-tasks';
 
 const PHASES: { id: ProjectStatus; label: string }[] = [
@@ -113,7 +117,9 @@ function FormattedSection({ content }: { content: string }) {
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<ProjectWithWorkspace | null>(null);
+  const [workspaceTeams, setWorkspaceTeams] = useState<{ id: string; name: string }[]>([]);
+  const [savingTeam, setSavingTeam] = useState(false);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,6 +130,7 @@ export default function ProjectDetailPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [viewingClientName, setViewingClientName] = useState<string | null>(null);
+  const { platformRole } = useAuth();
 
   const projectInboxHref = useMemo(() => {
     if (!project) return '/inbox';
@@ -133,6 +140,33 @@ export default function ProjectDetailPage() {
     }
     return `/inbox?${p.toString()}`;
   }, [project]);
+
+  useEffect(() => {
+    if (!project?.workspace_id) {
+      setWorkspaceTeams([]);
+      return;
+    }
+    let cancelled = false;
+    const internal = platformRole !== null && isInternalStaff(platformRole);
+    const url = internal
+      ? `/api/internal/workspace-teams?workspace_id=${encodeURIComponent(project.workspace_id)}`
+      : '/api/account/workspace-teams';
+
+    void fetch(url, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.teams || !Array.isArray(data.teams)) return;
+        setWorkspaceTeams(
+          data.teams.map((t: { id: string; name: string }) => ({ id: t.id, name: t.name }))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setWorkspaceTeams([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.workspace_id, platformRole]);
 
   useEffect(() => {
     async function loadContext() {
@@ -168,7 +202,7 @@ export default function ProjectDetailPage() {
           throw new Error(projectData.error || 'Failed to fetch project');
         }
 
-        setProject(projectData.project);
+        setProject(projectData.project as ProjectWithWorkspace);
         setMilestones(milestonesData.milestones || []);
         setTasks(tasksData.tasks || []);
       } catch (err: unknown) {
@@ -219,12 +253,34 @@ export default function ProjectDetailPage() {
         throw new Error(data.error || 'Failed to update status');
       }
 
-      setProject(data.project);
+      setProject(data.project as ProjectWithWorkspace);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to update status';
       alert(`Error: ${message}`);
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleTeamChange = async (nextTeamId: string) => {
+    if (!project || savingTeam) return;
+    setSavingTeam(true);
+    try {
+      const response = await fetch(`/api/projects/${params.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ team_id: nextTeamId || null }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update team');
+      }
+      setProject(data.project as ProjectWithWorkspace);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update team';
+      alert(message);
+    } finally {
+      setSavingTeam(false);
     }
   };
 
@@ -790,6 +846,33 @@ export default function ProjectDetailPage() {
                   {project.category}
                 </span>
               </div>
+
+              {project.workspace_id &&
+              (workspaceTeams.length > 0 ||
+                (platformRole !== null && isInternalStaff(platformRole))) ? (
+                <div className="pt-2 border-t border-gray-100">
+                  <label htmlFor="project-team" className="block text-sm text-gray-600 mb-1">
+                    Team
+                  </label>
+                  <select
+                    id="project-team"
+                    disabled={savingTeam}
+                    value={project.team_id ?? ''}
+                    onChange={(e) => void handleTeamChange(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 disabled:opacity-50"
+                  >
+                    <option value="">No team</option>
+                    {workspaceTeams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Links this project&apos;s spend to a team envelope on Account → Teams.
+                  </p>
+                </div>
+              ) : null}
 
               {/* Created Date */}
               <div className="flex items-start justify-between">

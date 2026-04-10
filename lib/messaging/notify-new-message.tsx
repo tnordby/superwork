@@ -1,13 +1,14 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import NewInboxMessageEmail from '@/emails/NewInboxMessageEmail';
 import { sendEmail } from '@/lib/email/send';
 import { uniqueEmailsPreservingCase } from '@/lib/messaging/unique-emails';
-import { createServiceRoleClient } from '@/lib/supabase/admin';
+import { tryCreateServiceRoleClient } from '@/lib/supabase/admin';
 
 function appBaseUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 }
 
-async function loadProfileEmails(admin: ReturnType<typeof createServiceRoleClient>, userIds: string[]) {
+async function loadProfileEmails(admin: SupabaseClient, userIds: string[]) {
   const unique = Array.from(new Set(userIds.filter(Boolean)));
   if (unique.length === 0) return [];
 
@@ -34,17 +35,13 @@ export type NotifyNewInboxMessageParams = {
 
 /**
  * Best-effort email to the other party on the thread. Does not throw to callers.
- * Requires RESEND_API_KEY and SUPABASE_SERVICE_ROLE_KEY.
+ * Requires RESEND_API_KEY; uses the service role client when SUPABASE_SERVICE_ROLE_KEY is configured.
  */
 export async function notifyNewInboxMessage(params: NotifyNewInboxMessageParams): Promise<void> {
   if (!process.env.RESEND_API_KEY) return;
 
-  let admin: ReturnType<typeof createServiceRoleClient>;
-  try {
-    admin = createServiceRoleClient();
-  } catch {
-    return;
-  }
+  const admin = tryCreateServiceRoleClient();
+  if (!admin) return;
 
   try {
     const { data: project, error: projectError } = await admin

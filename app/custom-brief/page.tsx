@@ -1,13 +1,69 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
+import { isInternalStaff } from '@/lib/auth/platform-role';
 
 export default function CustomBriefPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [workspaceTeams, setWorkspaceTeams] = useState<{ id: string; name: string }[]>([]);
+  const [teamIdForProject, setTeamIdForProject] = useState('');
+  const { platformRole } = useAuth();
+  const [internalSelectedWorkspaceId, setInternalSelectedWorkspaceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/internal/selected-workspace', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const id =
+          typeof data.workspace_id === 'string' && data.workspace_id.trim() ? data.workspace_id.trim() : null;
+        setInternalSelectedWorkspaceId(id);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (platformRole === null) return;
+    let cancelled = false;
+    const internal = isInternalStaff(platformRole);
+
+    const run = async () => {
+      let url: string | null = null;
+      if (internal) {
+        if (!internalSelectedWorkspaceId) {
+          if (!cancelled) setWorkspaceTeams([]);
+          return;
+        }
+        url = `/api/internal/workspace-teams?workspace_id=${encodeURIComponent(internalSelectedWorkspaceId)}`;
+      } else {
+        url = '/api/account/workspace-teams';
+      }
+      try {
+        const res = await fetch(url, { credentials: 'include' });
+        const data = res.ok ? await res.json() : null;
+        if (cancelled || !data?.teams || !Array.isArray(data.teams)) return;
+        setWorkspaceTeams(
+          data.teams.map((t: { id: string; name: string }) => ({ id: t.id, name: t.name }))
+        );
+      } catch {
+        if (!cancelled) setWorkspaceTeams([]);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [platformRole, internalSelectedWorkspaceId]);
   const [formData, setFormData] = useState({
     projectName: '',
     companyName: '',
@@ -54,15 +110,20 @@ ${formData.additionalContext || 'Not specified'}
       `.trim();
 
       // Create project first so quote client info is sourced from project ownership.
+      const projectPayload: Record<string, unknown> = {
+        name: formData.projectName,
+        description: briefDescription,
+        category: 'Custom Services',
+        service_type: 'Custom Brief',
+      };
+      if (teamIdForProject.trim()) {
+        projectPayload.team_id = teamIdForProject.trim();
+      }
+
       const projectResponse = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.projectName,
-          description: briefDescription,
-          category: 'Custom Services',
-          service_type: 'Custom Brief',
-        }),
+        body: JSON.stringify(projectPayload),
       });
       const projectData = await projectResponse.json();
       if (!projectResponse.ok || !projectData.project?.id) {
@@ -145,6 +206,33 @@ ${formData.additionalContext || 'Not specified'}
               placeholder="e.g., Advanced HubSpot Automation System"
             />
           </div>
+
+          {(workspaceTeams.length > 0 ||
+            (platformRole !== null &&
+              isInternalStaff(platformRole) &&
+              internalSelectedWorkspaceId)) ? (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <label htmlFor="brief-team" className="block text-sm font-medium text-gray-900 mb-1">
+                Team (optional)
+              </label>
+              <p className="text-xs text-gray-600 mb-2">
+                Attribute this brief&apos;s project to a team for budget tracking on Account → Teams.
+              </p>
+              <select
+                id="brief-team"
+                value={teamIdForProject}
+                onChange={(e) => setTeamIdForProject(e.target.value)}
+                className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">No team</option>
+                {workspaceTeams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           {/* Company Name */}
           <div>

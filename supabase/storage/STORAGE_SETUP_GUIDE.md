@@ -2,7 +2,14 @@
 
 ## Important Note
 
-Storage bucket policies **cannot be created via SQL Editor**. You must use the Supabase Dashboard UI to create them.
+Storage bucket policies **cannot be created via SQL Editor** in some hosted setups (permission errors on `storage.objects`). When that applies, use the **Supabase Dashboard** → **Storage** → **Policies** as below.
+
+If your project applies **SQL migrations** to the database (e.g. local CLI or CI), use the repo migrations for the canonical policy definitions:
+
+- **`supabase/migrations/040_assets_internal_staff_access.sql`** — `shared-assets` **SELECT** plus internal staff read paths on `public.assets` / related tables.
+- **`supabase/migrations/041_shared_assets_storage_write_hardening.sql`** — `shared-assets` **INSERT** (scoped paths), **UPDATE**, and **DELETE** (including internal staff where an `assets` row exists).
+
+After changing policies in SQL, re-test **upload**, **signed download/preview**, and **delete** for both a **customer** and an **internal** user.
 
 ---
 
@@ -41,6 +48,8 @@ on conflict (id) do nothing;
 Go to **Storage** > **Policies** > Select `shared-assets` bucket
 
 ### Policy 1: Select (View/Download)
+
+For production parity with the app (including **internal staff** signed URLs), use **`040_assets_internal_staff_access.sql`** instead of recreating the snippet below by hand.
 
 1. Click **New Policy**
 2. Select **For full customization** (or "Get started quickly" > "Select")
@@ -90,82 +99,17 @@ AND (
 
 ### Policy 2: Insert (Upload)
 
-1. Click **New Policy**
-2. Select **For full customization**
-3. Configure:
-   - **Policy name**: `Users can upload assets`
-   - **Allowed operation**: `INSERT`
-   - **Target roles**: `authenticated`
-   - **WITH CHECK expression**:
+Do **not** use a blanket “any authenticated user” insert in production. Prefer migration **`041_shared_assets_storage_write_hardening.sql`** (path must be `{auth.uid()}/…` or `{workspace_uuid}/…` with membership, or internal staff).
 
-```sql
-(bucket_id = 'shared-assets'::text)
-AND (auth.role() = 'authenticated'::text)
-```
-
-4. Click **Review** > **Save policy**
+If you must configure manually in the Dashboard, copy the **`WITH CHECK`** body from that migration file for policy name **`Users can upload assets to their workspaces`**.
 
 ### Policy 3: Update
 
-1. Click **New Policy**
-2. Select **For full customization**
-3. Configure:
-   - **Policy name**: `Users can update their own assets`
-   - **Allowed operation**: `UPDATE`
-   - **Target roles**: `authenticated`
-   - **USING expression**:
-
-```sql
-(bucket_id = 'shared-assets'::text)
-AND EXISTS (
-  SELECT 1 FROM public.assets
-  WHERE (assets.storage_path = objects.name)
-  AND (assets.user_id = auth.uid())
-)
-```
-
-4. Click **Review** > **Save policy**
+Use migration **`041_shared_assets_storage_write_hardening.sql`** for policy **`Users can update their own assets`** (asset owner **or** internal staff with a matching `assets` row).
 
 ### Policy 4: Delete
 
-1. Click **New Policy**
-2. Select **For full customization**
-3. Configure:
-   - **Policy name**: `Users and admins can delete assets`
-   - **Allowed operation**: `DELETE`
-   - **Target roles**: `authenticated`
-   - **USING expression**:
-
-```sql
-(bucket_id = 'shared-assets'::text)
-AND (
-  -- User owns the asset
-  EXISTS (
-    SELECT 1 FROM public.assets
-    WHERE (assets.storage_path = objects.name)
-    AND (assets.user_id = auth.uid())
-  )
-  -- User is workspace admin
-  OR EXISTS (
-    SELECT 1 FROM public.assets
-    JOIN public.workspace_members
-      ON workspace_members.workspace_id = assets.workspace_id
-    WHERE (assets.storage_path = objects.name)
-    AND (workspace_members.user_id = auth.uid())
-    AND (workspace_members.role IN ('admin', 'owner'))
-  )
-  -- User is workspace owner
-  OR EXISTS (
-    SELECT 1 FROM public.assets
-    JOIN public.workspaces
-      ON workspaces.id = assets.workspace_id
-    WHERE (assets.storage_path = objects.name)
-    AND (workspaces.owner_id = auth.uid())
-  )
-)
-```
-
-4. Click **Review** > **Save policy**
+Use migration **`041_shared_assets_storage_write_hardening.sql`** for policy **`Users can delete their own assets`** (owner, workspace admin/owner paths, **or** internal staff with a matching `assets` row).
 
 ---
 
@@ -187,11 +131,11 @@ You should see your bucket with:
 
 ### Test Policies
 
-Go to **Storage** > **Policies** and verify you see:
+Go to **Storage** > **Policies** and verify you see (names match migrations 040/041):
 - ✅ Users can view assets in their workspaces (SELECT)
-- ✅ Users can upload assets (INSERT)
+- ✅ Users can upload assets to their workspaces (INSERT)
 - ✅ Users can update their own assets (UPDATE)
-- ✅ Users and admins can delete assets (DELETE)
+- ✅ Users can delete their own assets (DELETE)
 
 ---
 
@@ -236,7 +180,7 @@ Make sure:
 After completing these steps, you should have:
 - ✅ `shared-assets` bucket created (private, 50MB limit)
 - ✅ SELECT policy for viewing assets
-- ✅ INSERT policy for uploading assets
+- ✅ INSERT policy for uploading assets (scoped paths, not “any authenticated”)
 - ✅ UPDATE policy for modifying assets
 - ✅ DELETE policy for removing assets
 

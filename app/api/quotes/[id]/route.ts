@@ -10,6 +10,7 @@ import { isQuoteManager } from '@/lib/auth/platform-role';
 import { validateQuoteAssignee } from '@/lib/auth/quote-assignee';
 import { computeValuePricing, roundUpToNearestThousand } from '@/lib/quotes/value-pricing';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
+import { resolveCustomerWorkspaceContext } from '@/lib/account/customer-workspace-context';
 
 const QUOTE_OPTIONAL_PRICING_COLUMNS = new Set([
   'estimated_hours_low',
@@ -307,17 +308,13 @@ export async function PATCH(
     // Customer can approve or reject
     if (existingQuote.user_id === user.id) {
       if (body.status === 'approved' && existingQuote.status === 'pending_customer_approval') {
-        const { data: customerWorkspace, error: wsLookupError } = await supabase
-          .from('workspaces')
-          .select('id')
-          .eq('owner_id', existingQuote.user_id)
-          .maybeSingle();
-
-        if (wsLookupError || !customerWorkspace) {
-          return NextResponse.json(
-            { error: 'Your workspace must be set up before you can approve quotes.' },
-            { status: 400 }
-          );
+        const customerWs = await resolveCustomerWorkspaceContext(existingQuote.user_id);
+        if ('error' in customerWs) {
+          const message =
+            customerWs.status === 404
+              ? 'Your workspace must be set up before you can approve quotes.'
+              : customerWs.error;
+          return NextResponse.json({ error: message }, { status: customerWs.status });
         }
 
         const quoteCents = quotePriceToCents(
@@ -326,7 +323,10 @@ export async function PATCH(
         );
 
         if (quoteCents > 0) {
-          const budget = await getWorkspaceBudgetSnapshot(supabase, customerWorkspace.id);
+          const budget = await getWorkspaceBudgetSnapshot(
+            customerWs.admin,
+            customerWs.workspace.id
+          );
           if (budget.availableCents < quoteCents) {
             return NextResponse.json(
               {
