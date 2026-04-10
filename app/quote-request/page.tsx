@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
@@ -82,7 +82,7 @@ function QuoteRequestForm() {
           </Link>
           <h1 className="text-3xl font-semibold text-gray-900 mb-2">Request Quote</h1>
           <p className="text-gray-600">
-            Tell us about your project and we'll provide a detailed quote
+            Tell us about your project and we&apos;ll provide a detailed quote
           </p>
         </div>
 
@@ -187,11 +187,11 @@ function QuoteRequestForm() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#bfe937] font-bold">2.</span>
-              <span>We'll prepare a detailed quote with pricing and timeline</span>
+              <span>We&apos;ll prepare a detailed quote with pricing and timeline</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#bfe937] font-bold">3.</span>
-              <span>You'll receive an email when your quote is ready</span>
+              <span>You&apos;ll receive an email when your quote is ready</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#bfe937] font-bold">4.</span>

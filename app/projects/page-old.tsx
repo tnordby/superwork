@@ -17,8 +17,6 @@ import {
   Boxes,
   Globe,
   Zap,
-  Brain,
-  Shield,
   LineChart,
   Bot,
   CheckCircle

@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Check } from 'lucide-react';
-import { formatAmount, formatBillingInterval } from '@/lib/stripe/utils';
+import { formatAmount } from '@/lib/stripe/utils';
 
 interface Plan {
   id: string;
@@ -21,7 +20,6 @@ export default function PlansPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     fetchPlans();

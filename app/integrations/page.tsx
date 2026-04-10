@@ -87,7 +87,7 @@ export default function IntegrationsPage() {
             Need a specific integration?
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Let us know which tools you'd like to connect with Superwork. We're always adding new integrations based on customer feedback.
+            Let us know which tools you&apos;d like to connect with Superwork. We&apos;re always adding new integrations based on customer feedback.
           </p>
           <a
             href="/feedback"

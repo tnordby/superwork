@@ -30,7 +30,6 @@ interface Props {
   setMarketingFormData: (data: MarketingFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   loading: boolean;
-  estimatedHours?: number;
 }
 
 export default function MarketingHubForm({
@@ -40,7 +39,6 @@ export default function MarketingHubForm({
   setMarketingFormData,
   onSubmit,
   loading,
-  estimatedHours,
 }: Props) {
   const updateField = <K extends keyof MarketingFormData>(field: K, value: MarketingFormData[K]) => {
     setMarketingFormData({ ...marketingFormData, [field]: value });
@@ -463,7 +461,7 @@ export default function MarketingHubForm({
 
       {/* What's Included Summary */}
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-6">
-        <h4 className="text-sm font-medium text-gray-900 mb-3">What We'll Deliver</h4>
+        <h4 className="text-sm font-medium text-gray-900 mb-3">What We&apos;ll Deliver</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           <div className="text-sm text-gray-700 flex items-start gap-2">
             <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />

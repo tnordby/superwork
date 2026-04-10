@@ -123,7 +123,7 @@ ${formData.additionalContext || 'Not specified'}
           </Link>
           <h1 className="text-3xl font-semibold text-gray-900 mb-2">Submit Custom Brief</h1>
           <p className="text-gray-600">
-            Tell us about your unique needs and we'll create a tailored solution for you
+            Tell us about your unique needs and we&apos;ll create a tailored solution for you
           </p>
         </div>
 
@@ -362,15 +362,15 @@ ${formData.additionalContext || 'Not specified'}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#bfe937] font-bold">2.</span>
-              <span>We'll schedule a discovery call to dive deeper into your requirements</span>
+              <span>We&apos;ll schedule a discovery call to dive deeper into your requirements</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#bfe937] font-bold">3.</span>
-              <span>You'll receive a custom proposal with timeline and pricing</span>
+              <span>You&apos;ll receive a custom proposal with timeline and pricing</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#bfe937] font-bold">4.</span>
-              <span>Once approved, we'll kick off your project with a dedicated team</span>
+              <span>Once approved, we&apos;ll kick off your project with a dedicated team</span>
             </li>
           </ul>
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -52,7 +52,6 @@ const MOCK_TASKS = [
 
 export default function ProjectDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

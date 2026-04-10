@@ -3,6 +3,12 @@
 import { useState, useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 
+/** Single value for a dynamic intake field (JSON-serializable). */
+export type IntakeResponseValue = string | number | boolean | string[] | undefined
+
+/** All responses keyed by field name. */
+export type IntakeResponseMap = Record<string, IntakeResponseValue>
+
 interface IntakeFormField {
   id: string
   field_name: string
@@ -13,7 +19,7 @@ interface IntakeFormField {
   is_required: boolean
   order_index: number
   options?: string[]
-  validation?: Record<string, any>
+  validation?: Record<string, unknown>
   default_value?: string
 }
 
@@ -27,7 +33,7 @@ interface IntakeFormCondition {
 
 interface DynamicIntakeFormProps {
   serviceTemplateId: string
-  onSubmit: (responses: Record<string, any>) => void
+  onSubmit: (responses: IntakeResponseMap) => void
   loading: boolean
 }
 
@@ -38,7 +44,7 @@ export default function DynamicIntakeForm({
 }: DynamicIntakeFormProps) {
   const [fields, setFields] = useState<IntakeFormField[]>([])
   const [conditions, setConditions] = useState<IntakeFormCondition[]>([])
-  const [responses, setResponses] = useState<Record<string, any>>({})
+  const [responses, setResponses] = useState<IntakeResponseMap>({})
   const [visibleFields, setVisibleFields] = useState<Set<string>>(new Set())
   const [formLoading, setFormLoading] = useState(true)
 
@@ -54,7 +60,7 @@ export default function DynamicIntakeForm({
           setConditions(data.conditions || [])
 
           // Initialize responses with default values
-          const initialResponses: Record<string, any> = {}
+          const initialResponses: IntakeResponseMap = {}
           data.fields.forEach((field: IntakeFormField) => {
             if (field.default_value) {
               initialResponses[field.field_name] = field.default_value
@@ -107,7 +113,7 @@ export default function DynamicIntakeForm({
     setVisibleFields(newVisibleFields)
   }, [responses, conditions])
 
-  const handleFieldChange = (fieldName: string, value: unknown) => {
+  const handleFieldChange = (fieldName: string, value: IntakeResponseValue) => {
     setResponses((prev) => ({
       ...prev,
       [fieldName]: value,
@@ -124,7 +130,14 @@ export default function DynamicIntakeForm({
       return null
     }
 
-    const value = responses[field.field_name] ?? ''
+    const value = responses[field.field_name]
+    const textLikeValue =
+      value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value)
+    const validation = field.validation
+    const validationMin =
+      validation && typeof validation.min === 'number' ? validation.min : undefined
+    const validationMax =
+      validation && typeof validation.max === 'number' ? validation.max : undefined
 
     switch (field.field_type) {
       case 'text':
@@ -137,7 +150,7 @@ export default function DynamicIntakeForm({
             </label>
             <input
               type={field.field_type}
-              value={value}
+              value={textLikeValue}
               onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
               required={field.is_required}
               placeholder={field.placeholder}
@@ -157,12 +170,12 @@ export default function DynamicIntakeForm({
             </label>
             <input
               type="number"
-              value={value}
+              value={textLikeValue}
               onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
               required={field.is_required}
               placeholder={field.placeholder}
-              min={field.validation?.min}
-              max={field.validation?.max}
+              min={validationMin}
+              max={validationMax}
               className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
             />
             {field.help_text && (
@@ -178,7 +191,7 @@ export default function DynamicIntakeForm({
               {field.label} {field.is_required && <span className="text-red-500">*</span>}
             </label>
             <textarea
-              value={value}
+              value={textLikeValue}
               onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
               required={field.is_required}
               placeholder={field.placeholder}
@@ -198,7 +211,7 @@ export default function DynamicIntakeForm({
               {field.label} {field.is_required && <span className="text-red-500">*</span>}
             </label>
             <select
-              value={value}
+              value={textLikeValue}
               onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
               required={field.is_required}
               className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
@@ -229,7 +242,7 @@ export default function DynamicIntakeForm({
                     type="radio"
                     name={field.field_name}
                     value={option}
-                    checked={value === option}
+                    checked={textLikeValue === option}
                     onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
                     required={field.is_required}
                     className="w-4 h-4 text-gray-900 focus:ring-gray-900"
@@ -276,9 +289,9 @@ export default function DynamicIntakeForm({
                 <label key={option} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={(value as string[])?.includes(option) || false}
+                    checked={Array.isArray(value) ? value.includes(option) : false}
                     onChange={(e) => {
-                      const currentValues = (value as string[]) || []
+                      const currentValues = Array.isArray(value) ? value : []
                       if (e.target.checked) {
                         handleFieldChange(field.field_name, [...currentValues, option])
                       } else {

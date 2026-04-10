@@ -6,7 +6,7 @@ export default function FeedbackPage() {
 
       <div className="rounded-lg border border-gray-200 p-6">
         <p className="text-gray-600">Feedback form will appear here</p>
-        <p className="text-sm text-gray-500 mt-2">This is not live chat and not ticketing - it's asynchronous, contextual communication.</p>
+        <p className="text-sm text-gray-500 mt-2">This is not live chat and not ticketing — it&apos;s asynchronous, contextual communication.</p>
       </div>
     </div>
   );

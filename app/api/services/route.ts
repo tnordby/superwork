@@ -4,7 +4,7 @@ import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isServicesAdmin } from '@/lib/auth/platform-role';
 
 // GET - List all active service templates
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient();
 

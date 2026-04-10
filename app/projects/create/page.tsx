@@ -3,9 +3,9 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import MarketingHubForm from './MarketingHubForm';
-import DynamicIntakeForm from './DynamicIntakeForm';
+import DynamicIntakeForm, { type IntakeResponseMap } from './DynamicIntakeForm';
 
 interface ServiceTemplate {
   id: string;
@@ -52,7 +52,7 @@ function CreateProjectForm() {
   const [error, setError] = useState('');
   const [serviceTemplate, setServiceTemplate] = useState<ServiceTemplate | null>(null);
   const [templateLoading, setTemplateLoading] = useState(false);
-  const [intakeResponses, setIntakeResponses] = useState<Record<string, any> | null>(null);
+  const [intakeResponses, setIntakeResponses] = useState<IntakeResponseMap | null>(null);
   const [hasIntakeForm, setHasIntakeForm] = useState(false);
 
   // Fetch service template if templateId is provided
@@ -121,7 +121,7 @@ function CreateProjectForm() {
   // Format dynamic intake form responses into markdown description
   type IntakeFieldDef = { field_name: string; label: string; field_type?: string };
 
-  const formatIntakeResponses = async (responses: Record<string, unknown>, templateId: string) => {
+  const formatIntakeResponses = async (responses: IntakeResponseMap, templateId: string) => {
     // Fetch the intake form fields to get labels
     const intakeFormRes = await fetch(`/api/services/${templateId}/intake-form`);
     const intakeFormData = await intakeFormRes.json();
@@ -150,7 +150,7 @@ function CreateProjectForm() {
     return standardDescription + intakeFormMarkdown;
   };
 
-  const handleIntakeFormSubmit = async (responses: Record<string, unknown>) => {
+  const handleIntakeFormSubmit = async (responses: IntakeResponseMap) => {
     setIntakeResponses(responses);
     setLoading(true);
     setError('');
@@ -353,7 +353,6 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
           setMarketingFormData={setMarketingFormData}
           onSubmit={handleSubmit}
           loading={loading}
-          estimatedHours={serviceTemplate?.estimated_hours || 80}
         />
       </div>
     );
