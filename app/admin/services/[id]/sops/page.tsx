@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -23,8 +23,6 @@ interface SOP {
 export default function AdminSOPsPage() {
   const params = useParams()
   const serviceId = params.id as string
-  const supabase = createClient()
-
   const [service, setService] = useState<Service | null>(null)
   const [sops, setSOPs] = useState<SOP[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,10 +34,10 @@ export default function AdminSOPsPage() {
     description: '',
   })
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
+    const supabase = createClient()
 
-    // Load service
     const { data: serviceData } = await supabase
       .from('service_templates')
       .select('*')
@@ -57,11 +55,12 @@ export default function AdminSOPsPage() {
 
     setSOPs(sopsData || [])
     setLoading(false)
-  }
+  }, [serviceId])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount
     void loadData()
-  }, [serviceId])
+  }, [loadData])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

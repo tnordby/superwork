@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { sumCommittedBalanceCents, sumUsedBalanceCents } from '@/lib/billing/project-balances';
 import { formatAmount } from '@/lib/stripe/utils';
@@ -40,11 +40,7 @@ export default function UsagePage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    fetchUsageData();
-  }, []);
-
-  const fetchUsageData = async () => {
+  const fetchUsageData = useCallback(async () => {
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -122,7 +118,11 @@ export default function UsagePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    void fetchUsageData();
+  }, [fetchUsageData]);
 
   if (loading) {
     return (

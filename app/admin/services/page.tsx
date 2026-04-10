@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 interface Service {
@@ -17,10 +17,9 @@ export default function AdminServicesPage() {
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const supabase = createClient()
-
-  async function loadServices() {
+  const loadServices = useCallback(async () => {
     setLoading(true)
+    const supabase = createClient()
     const { data, error } = await supabase
       .from('service_templates')
       .select('*')
@@ -33,11 +32,12 @@ export default function AdminServicesPage() {
       setServices(data || [])
     }
     setLoading(false)
-  }
+  }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount
     void loadServices()
-  }, [])
+  }, [loadServices])
 
   async function handleDelete(id: string) {
     const response = await fetch(`/api/services/${id}`, {

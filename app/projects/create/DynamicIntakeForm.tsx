@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Loader2 } from 'lucide-react'
 
 /** Single value for a dynamic intake field (JSON-serializable). */
@@ -45,7 +45,6 @@ export default function DynamicIntakeForm({
   const [fields, setFields] = useState<IntakeFormField[]>([])
   const [conditions, setConditions] = useState<IntakeFormCondition[]>([])
   const [responses, setResponses] = useState<IntakeResponseMap>({})
-  const [visibleFields, setVisibleFields] = useState<Set<string>>(new Set())
   const [formLoading, setFormLoading] = useState(true)
 
   // Fetch intake form configuration
@@ -69,13 +68,6 @@ export default function DynamicIntakeForm({
             }
           })
           setResponses(initialResponses)
-
-          // Initialize visible fields (all required fields + non-conditional fields)
-          const initialVisible = new Set<string>()
-          data.fields.forEach((field: IntakeFormField) => {
-            initialVisible.add(field.field_name)
-          })
-          setVisibleFields(initialVisible)
         }
       } catch (error) {
         console.error('Error fetching intake form:', error)
@@ -87,31 +79,27 @@ export default function DynamicIntakeForm({
     fetchIntakeForm()
   }, [serviceTemplateId])
 
-  // Update visible fields based on conditional logic
-  useEffect(() => {
-    const newVisibleFields = new Set(visibleFields)
-
+  const visibleFieldNames = useMemo(() => {
+    const next = new Set(fields.map((f) => f.field_name))
     conditions.forEach((condition) => {
       const triggerValue = responses[condition.trigger_field_name]
 
       if (triggerValue === condition.trigger_value) {
         if (condition.action === 'show') {
-          condition.target_field_names.forEach((name) => newVisibleFields.add(name))
+          condition.target_field_names.forEach((name) => next.add(name))
         } else if (condition.action === 'hide') {
-          condition.target_field_names.forEach((name) => newVisibleFields.delete(name))
+          condition.target_field_names.forEach((name) => next.delete(name))
         }
       } else {
-        // Reverse the condition if trigger doesn't match
         if (condition.action === 'show') {
-          condition.target_field_names.forEach((name) => newVisibleFields.delete(name))
+          condition.target_field_names.forEach((name) => next.delete(name))
         } else if (condition.action === 'hide') {
-          condition.target_field_names.forEach((name) => newVisibleFields.add(name))
+          condition.target_field_names.forEach((name) => next.add(name))
         }
       }
     })
-
-    setVisibleFields(newVisibleFields)
-  }, [responses, conditions])
+    return next
+  }, [fields, conditions, responses])
 
   const handleFieldChange = (fieldName: string, value: IntakeResponseValue) => {
     setResponses((prev) => ({
@@ -126,7 +114,7 @@ export default function DynamicIntakeForm({
   }
 
   const renderField = (field: IntakeFormField) => {
-    if (!visibleFields.has(field.field_name)) {
+    if (!visibleFieldNames.has(field.field_name)) {
       return null
     }
 

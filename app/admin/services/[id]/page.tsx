@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -19,8 +19,6 @@ export default function EditServicePage() {
   const router = useRouter()
   const params = useParams()
   const serviceId = params.id as string
-  const supabase = createClient()
-
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
@@ -31,7 +29,8 @@ export default function EditServicePage() {
     is_active: true,
   })
 
-  async function loadService() {
+  const loadService = useCallback(async () => {
+    const supabase = createClient()
     const { data, error } = await supabase
       .from('service_templates')
       .select('*')
@@ -52,11 +51,12 @@ export default function EditServicePage() {
       is_active: data.is_active,
     })
     setLoading(false)
-  }
+  }, [router, serviceId])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount
     void loadService()
-  }, [serviceId])
+  }, [loadService])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

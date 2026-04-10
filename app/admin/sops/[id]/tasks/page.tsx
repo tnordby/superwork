@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -31,8 +31,6 @@ export default function AdminTasksPage() {
   const params = useParams()
   const router = useRouter()
   const sopId = params.id as string
-  const supabase = createClient()
-
   const [sop, setSOP] = useState<SOP | null>(null)
   const [service, setService] = useState<Service | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
@@ -47,10 +45,10 @@ export default function AdminTasksPage() {
     estimated_hours: '',
   })
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
+    const supabase = createClient()
 
-    // Load SOP
     const { data: sopData } = await supabase
       .from('service_sops')
       .select('*')
@@ -82,11 +80,12 @@ export default function AdminTasksPage() {
     }
 
     setLoading(false)
-  }
+  }, [router, sopId])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount
     void loadData()
-  }, [sopId])
+  }, [loadData])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

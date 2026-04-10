@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Upload, FileText, Image as ImageIcon, File, Download, Trash2, Search, FolderOpen, Loader2 } from 'lucide-react';
 import { Asset, Workspace, AssetCategory } from '@/types/assets';
 
@@ -20,7 +20,10 @@ function AssetImagePreview({
     if (loading) return;
 
     let active = true;
-    setLoading(true);
+    // Defer loading state so this effect does not call setState synchronously (react-hooks/set-state-in-effect).
+    const loadingFrame = requestAnimationFrame(() => {
+      if (active) setLoading(true);
+    });
     fetch(`/api/assets/${assetId}/preview`, { credentials: 'include' })
       .then(async (r) => {
         if (!r.ok) throw new Error(`preview request failed: ${r.status}`);
@@ -42,6 +45,7 @@ function AssetImagePreview({
 
     return () => {
       active = false;
+      cancelAnimationFrame(loadingFrame);
     };
   }, [assetId, hovered, src, loading]);
 
@@ -51,7 +55,11 @@ function AssetImagePreview({
   }
 
   if (src) {
-    return <img src={src} alt="" className="h-full w-full rounded-xl object-cover" />;
+    /* Signed preview URLs are dynamic; next/image remotePatterns would be brittle. */
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- asset preview uses short-lived signed URLs
+      <img src={src} alt="" className="h-full w-full rounded-xl object-cover" />
+    );
   }
 
   if (loading) {
@@ -76,11 +84,54 @@ export default function AssetsPage() {
   const [viewingClientName, setViewingClientName] = useState<string | null>(null);
   const dragDepth = useRef(0);
 
-  // Load workspaces and assets on mount
+  const loadWorkspaces = useCallback(async () => {
+    try {
+      const response = await fetch('/api/workspaces', { credentials: 'include' });
+      if (response.ok) {
+        const data = await response.json();
+        setWorkspaces(data.workspaces || []);
+      }
+    } catch (error) {
+      console.error('Failed to load workspaces:', error);
+    }
+  }, []);
+
+  const loadAssets = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedWorkspace) {
+        params.append('workspace_id', selectedWorkspace);
+      }
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
+
+      const response = await fetch(`/api/assets?${params.toString()}`, {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAssets(data.assets || []);
+      } else {
+        const body = await response.json().catch(() => ({}));
+        console.error('Failed to load assets', response.status, body);
+      }
+    } catch (error) {
+      console.error('Failed to load assets:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedWorkspace, searchQuery]);
+
+  const loadAssetsRef = useRef(loadAssets);
+  loadAssetsRef.current = loadAssets;
+
+  // Load workspaces and refresh assets when workspace filter changes (not on every search keystroke).
   useEffect(() => {
-    loadWorkspaces();
-    loadAssets();
-  }, [selectedWorkspace]);
+    void loadWorkspaces();
+    void loadAssetsRef.current();
+  }, [selectedWorkspace, loadWorkspaces]);
 
   useEffect(() => {
     let mounted = true;
@@ -142,52 +193,10 @@ export default function AssetsPage() {
     };
   }, [selectedWorkspace]);
 
-  const loadWorkspaces = async () => {
-    try {
-      const response = await fetch('/api/workspaces', { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        setWorkspaces(data.workspaces || []);
-      }
-    } catch (error) {
-      console.error('Failed to load workspaces:', error);
-    }
-  };
-
-  const loadAssets = async () => {
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (selectedWorkspace) {
-        params.append('workspace_id', selectedWorkspace);
-      }
-      if (searchQuery) {
-        params.append('search', searchQuery);
-      }
-
-      const response = await fetch(`/api/assets?${params.toString()}`, {
-        credentials: 'include',
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setAssets(data.assets || []);
-      } else {
-        const body = await response.json().catch(() => ({}));
-        console.error('Failed to load assets', response.status, body);
-      }
-    } catch (error) {
-      console.error('Failed to load assets:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchQuery !== undefined) {
-        loadAssets();
-      }
+      void loadAssetsRef.current();
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, PlusCircle } from 'lucide-react';
 import { sumCommittedBalanceCents, sumUsedBalanceCents } from '@/lib/billing/project-balances';
@@ -40,11 +40,26 @@ export default function BalancePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    fetchBalance();
+  const syncSubscription = useCallback(async () => {
+    try {
+      const response = await fetch('/api/stripe/sync-subscription', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        console.error('Sync error:', error);
+        throw new Error(error.error);
+      }
+    } catch (error) {
+      console.error('Error syncing subscription:', error);
+      throw error;
+    }
   }, []);
 
-  const fetchBalance = async () => {
+  const fetchBalance = useCallback(async () => {
     setLoadError(null);
     try {
       const supabase = createClient();
@@ -55,7 +70,6 @@ export default function BalancePage() {
         return;
       }
 
-      // Prefer owned workspace, then fallback to membership workspace.
       let { data: workspaceData } = await supabase
         .from('workspaces')
         .select('*')
@@ -76,7 +90,6 @@ export default function BalancePage() {
       if (workspaceData) {
         setWorkspace(workspaceData);
 
-        // Fetch subscription details from Stripe if they have an active subscription
         if (workspaceData.stripe_subscription_id) {
           const response = await fetch(`/api/stripe/subscription?subscriptionId=${workspaceData.stripe_subscription_id}`);
 
@@ -88,11 +101,9 @@ export default function BalancePage() {
             console.error('Subscription API error:', error);
           }
         } else if (workspaceData.stripe_customer_id) {
-          // Auto-sync if they have a customer ID but no subscription ID
           await syncSubscription();
         }
 
-        // Fetch projects: used (completed) vs committed (not completed)
         const { data: projectsData, error: projectsError } = await supabase
           .from('projects')
           .select('cost, status')
@@ -110,31 +121,15 @@ export default function BalancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router, syncSubscription]);
+
+  useEffect(() => {
+    void fetchBalance();
+  }, [fetchBalance]);
 
   const startingBalance = subscriptionData?.amount || 0;
   const currency = subscriptionData?.currency || 'eur';
   const availableBalance = startingBalance - projectCosts.usedBalance - projectCosts.committedBalance;
-
-  const syncSubscription = async () => {
-    try {
-      const response = await fetch('/api/stripe/sync-subscription', {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        // Reload the page to fetch updated data
-        window.location.reload();
-      } else {
-        const error = await response.json();
-        console.error('Sync error:', error);
-        throw new Error(error.error);
-      }
-    } catch (error) {
-      console.error('Error syncing subscription:', error);
-      throw error;
-    }
-  };
 
   if (loading) {
     return (

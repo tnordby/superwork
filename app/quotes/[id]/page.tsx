@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -35,16 +35,17 @@ export default function QuoteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  async function loadQuote() {
+  const loadQuote = useCallback(async () => {
     const response = await fetch(`/api/quotes/${quoteId}`, { credentials: 'include' });
     const data = await response.json();
     if (response.ok) setQuote(data.quote);
     setLoading(false);
-  }
+  }, [quoteId]);
 
   useEffect(() => {
-    loadQuote();
-  }, [quoteId]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; loadQuote hydrates quote state
+    void loadQuote();
+  }, [loadQuote]);
 
   async function handleApprove() {
     setSaving(true);

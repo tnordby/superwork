@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreditCard, Calendar, Check, Zap } from 'lucide-react';
 import { sumCommittedBalanceCents, sumUsedBalanceCents } from '@/lib/billing/project-balances';
@@ -51,11 +51,7 @@ export default function PlanPage() {
   const [pageError, setPageError] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -157,7 +153,11 @@ export default function PlanPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   const handleManageBilling = async () => {
     if (!workspace?.id) return;

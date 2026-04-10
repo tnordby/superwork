@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreditCard, Calendar, ExternalLink, Download } from 'lucide-react';
 import { formatAmount, formatBillingInterval, formatSubscriptionStatus } from '@/lib/stripe/utils';
@@ -33,11 +33,7 @@ export default function BillingPage() {
   const [managingBilling, setManagingBilling] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    fetchBillingData();
-  }, []);
-
-  const fetchBillingData = async () => {
+  const fetchBillingData = useCallback(async () => {
     try {
       const workspaceId = localStorage.getItem('currentWorkspaceId');
 
@@ -58,7 +54,11 @@ export default function BillingPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    void fetchBillingData();
+  }, [fetchBillingData]);
 
   const handleManageBilling = async () => {
     if (!workspace?.id) return;

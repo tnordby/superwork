@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 type ContractRow = {
   id: string;
@@ -41,7 +41,7 @@ export function WorkspaceContractsPanel({ workspaceId }: { workspaceId: string }
   const [draft, setDraft] = useState<DraftContract>(emptyDraft);
   const [creating, setCreating] = useState(false);
 
-  async function loadContracts() {
+  const loadContracts = useCallback(async () => {
     setLoading(true);
     const response = await fetch(`/api/internal/customer-workspaces/${workspaceId}/contracts`, {
       credentials: 'include',
@@ -52,11 +52,12 @@ export function WorkspaceContractsPanel({ workspaceId }: { workspaceId: string }
       setCanManage(Boolean(data.can_manage));
     }
     setLoading(false);
-  }
+  }, [workspaceId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount
     void loadContracts();
-  }, [workspaceId]);
+  }, [loadContracts]);
 
   async function createContract() {
     setCreating(true);

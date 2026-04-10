@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ExternalLink, Download } from 'lucide-react';
 import { formatAmount } from '@/lib/stripe/utils';
@@ -28,11 +28,7 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    fetchInvoices();
-  }, []);
-
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -75,7 +71,11 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    void fetchInvoices();
+  }, [fetchInvoices]);
 
   if (loading) {
     return (
