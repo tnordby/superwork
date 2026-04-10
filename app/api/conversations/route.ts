@@ -15,6 +15,8 @@ import { checkCustomerConsultantName } from '@/lib/messaging/conversation-rules'
  * - Consultants must be assigned to the project. Admin/PM have full access.
  * - Internal staff: creating/sending is allowed without a selected client context; when a client
  *   context is selected, the project must belong to that workspace (403 otherwise).
+ * - When a project first moves into a started status (e.g. in_progress), the server may auto-create
+ *   a thread for the customer with PM + delivery contacts (see lib/messaging/project-start-conversation).
  */
 
 function getInitialsFromName(name: string): string {

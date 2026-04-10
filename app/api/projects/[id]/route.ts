@@ -6,6 +6,7 @@ import { isInternalStaff } from '@/lib/auth/platform-role';
 import type { PlatformRole } from '@/lib/auth/platform-role';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 import { getWorkspaceBudgetSnapshot } from '@/lib/billing/workspace-budget';
+import { ensureConversationWhenProjectStarts } from '@/lib/messaging/project-start-conversation';
 
 async function loadProjectWithAccessScope(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -168,6 +169,18 @@ export async function PATCH(
     if (error) {
       console.error('Error updating project:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (transitionsIntoStarted && project) {
+      const customerUserId = typeof project.user_id === 'string' ? project.user_id : '';
+      const assignee =
+        typeof project.assignee === 'string' && project.assignee.trim() ? project.assignee.trim() : null;
+      if (customerUserId) {
+        void ensureConversationWhenProjectStarts(id, {
+          user_id: customerUserId,
+          assignee,
+        });
+      }
     }
 
     return NextResponse.json({ project }, { status: 200 });
