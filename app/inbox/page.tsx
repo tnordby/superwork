@@ -1,9 +1,10 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Paperclip, MoreVertical } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { useSidebar } from '@/components/SidebarContext';
 import { DEFAULT_TEAM_CONTACT_NAME } from '@/lib/messaging/constants';
 import type { ConversationSummary, MessageRow, ConversationOption } from '@/types/messaging';
 
@@ -18,6 +19,18 @@ export default function InboxPage() {
     <Suspense fallback={<InboxLoadingFallback />}>
       <InboxPageContent />
     </Suspense>
+  );
+}
+
+function InboxShell({ children }: { children: ReactNode }) {
+  const { isCollapsed } = useSidebar();
+  const leftOffset = isCollapsed ? 'left-20' : 'left-64';
+  return (
+    <div
+      className={`fixed inset-0 top-16 bg-gray-50 transition-all duration-300 ${leftOffset}`}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -284,7 +297,7 @@ function InboxPageContent() {
   };
 
   return (
-    <div className="fixed inset-0 left-64 top-16 bg-gray-50">
+    <InboxShell>
       <div className="h-full flex">
         {/* Left sidebar - Conversations list */}
         <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
@@ -527,18 +540,18 @@ function InboxPageContent() {
           </div>
         </div>
       </div>
-    </div>
+    </InboxShell>
   );
 }
 
 function InboxLoadingFallback() {
   return (
-    <div className="fixed inset-0 left-64 top-16 bg-gray-50">
-      <div className="h-full flex flex-col items-center justify-center gap-3 text-sm text-gray-600">
+    <InboxShell>
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-gray-600">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" aria-hidden />
         <span>Loading inbox…</span>
       </div>
-    </div>
+    </InboxShell>
   );
 }
 
