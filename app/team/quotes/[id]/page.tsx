@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { computeValuePricing, roundUpToNearestThousand } from '@/lib/quotes/value-pricing';
@@ -81,22 +81,7 @@ export default function TeamQuoteReviewPage() {
     { title: string; description: string; estimated_hours: string }[]
   >([]);
 
-  const adjustedHoursNum = Number(adjustedHours || 0);
-  const pricingPreview = computeValuePricing({
-    adjustedHours: adjustedHoursNum,
-    estimatedHoursLow: Number(estimatedHoursLow || 0),
-    estimatedHoursHigh: Number(estimatedHoursHigh || 0),
-    internalHourlyRate: Number(internalHourlyRate || 0),
-    passThroughCosts: Number(passThroughCosts || 0),
-    desiredMarginPercent: Number(desiredMarginPercent || 0),
-    certaintyBufferPercent: Number(certaintyBufferPercent || 0),
-    valueAdjustment: Number(valueAdjustment || 0),
-    valueAnchorPrice: Number(valueAnchorPrice || 0),
-    valueConfidenceScore: Number(valueConfidenceScore || 0),
-  });
-  const suggestedRoundedPrice = roundUpToNearestThousand(pricingPreview.finalPrice);
-
-  async function loadQuote() {
+  const loadQuote = useCallback(async () => {
     setLoading(true);
     setError(null);
     const response = await fetch(`/api/quotes/${quoteId}`, { credentials: 'include' });
@@ -153,24 +138,42 @@ export default function TeamQuoteReviewPage() {
         : []
     );
     setLoading(false);
-  }
-
-  useEffect(() => {
-    loadQuote();
   }, [quoteId]);
 
   useEffect(() => {
-    if (finalPriceTouched) return;
-    if (quote?.final_price != null) return;
-    setFinalPrice(String(suggestedRoundedPrice));
-  }, [finalPriceTouched, quote?.final_price, suggestedRoundedPrice]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; loadQuote async-hydrates form (sync setLoading is expected)
+    void loadQuote();
+  }, [loadQuote]);
 
-  useEffect(() => {
-    if (!adjustedHours && milestones.length > 0) {
-      const sum = milestones.reduce((acc, m) => acc + Number(m.estimated_hours || 0), 0);
-      if (sum > 0) setAdjustedHours(String(sum));
-    }
-  }, [milestones, adjustedHours]);
+  const milestoneHoursTotal = useMemo(
+    () => milestones.reduce((acc, m) => acc + Number(m.estimated_hours || 0), 0),
+    [milestones]
+  );
+
+  const displayAdjustedHours =
+    adjustedHours === '' && milestoneHoursTotal > 0
+      ? String(milestoneHoursTotal)
+      : adjustedHours;
+
+  const adjustedHoursNum = Number(displayAdjustedHours || 0);
+  const pricingPreview = computeValuePricing({
+    adjustedHours: adjustedHoursNum,
+    estimatedHoursLow: Number(estimatedHoursLow || 0),
+    estimatedHoursHigh: Number(estimatedHoursHigh || 0),
+    internalHourlyRate: Number(internalHourlyRate || 0),
+    passThroughCosts: Number(passThroughCosts || 0),
+    desiredMarginPercent: Number(desiredMarginPercent || 0),
+    certaintyBufferPercent: Number(certaintyBufferPercent || 0),
+    valueAdjustment: Number(valueAdjustment || 0),
+    valueAnchorPrice: Number(valueAnchorPrice || 0),
+    valueConfidenceScore: Number(valueConfidenceScore || 0),
+  });
+  const suggestedRoundedPrice = roundUpToNearestThousand(pricingPreview.finalPrice);
+
+  const displayFinalPrice =
+    quote && !finalPriceTouched && quote.final_price == null
+      ? String(suggestedRoundedPrice)
+      : finalPrice;
 
   async function saveAndSendToCustomer() {
     setSaving(true);
@@ -180,7 +183,7 @@ export default function TeamQuoteReviewPage() {
       credentials: 'include',
       body: JSON.stringify({
         value_pricing: {
-          adjusted_hours: Number(adjustedHours || 0),
+          adjusted_hours: Number(displayAdjustedHours || 0),
           estimated_hours_low: Number(estimatedHoursLow || 0),
           estimated_hours_high: Number(estimatedHoursHigh || 0),
           internal_hourly_rate: Number(internalHourlyRate || 0),
@@ -206,7 +209,7 @@ export default function TeamQuoteReviewPage() {
           estimated_hours: m.estimated_hours ? Number(m.estimated_hours) : null,
         })),
         pricing_rationale: pricingRationale,
-        final_price: finalPrice ? Number(finalPrice) : undefined,
+        final_price: displayFinalPrice ? Number(displayFinalPrice) : undefined,
         status: 'pending_customer_approval',
       }),
     });
@@ -322,7 +325,7 @@ export default function TeamQuoteReviewPage() {
           <label className="text-sm text-gray-700">
             Adjusted Hours
             <input
-              value={adjustedHours}
+              value={displayAdjustedHours}
               onChange={(e) => setAdjustedHours(e.target.value)}
               type="number"
               min="0"
@@ -490,7 +493,7 @@ export default function TeamQuoteReviewPage() {
           <label className="text-sm text-gray-700">
             Final Price (Customer sees this)
             <input
-              value={finalPrice}
+              value={displayFinalPrice}
               onChange={(e) => {
                 setFinalPriceTouched(true);
                 setFinalPrice(e.target.value);
@@ -591,7 +594,7 @@ export default function TeamQuoteReviewPage() {
         <div className="rounded-xl border border-[#bfe937] bg-[#f7ffe3] p-4 shadow-sm">
           <p className="text-xs uppercase tracking-wide text-gray-500">Client-facing price</p>
           <p className="mt-1 text-2xl font-semibold text-gray-900">
-            {finalPrice !== '' ? `${finalPrice} ${quote.currency || ''}` : 'Not set'}
+            {displayFinalPrice !== '' ? `${displayFinalPrice} ${quote.currency || ''}` : 'Not set'}
           </p>
           <p className="mt-1 text-xs text-gray-600">
             Final client prices are rounded up to the nearest 1000.
