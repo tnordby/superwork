@@ -28,13 +28,25 @@ function getStatusClasses(status: string): string {
 export default function QuotesPage() {
   const [quotes, setQuotes] = useState<QuoteListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     (async () => {
-      const response = await fetch('/api/quotes', { credentials: 'include' });
-      const data = await response.json();
-      setQuotes(data.quotes || []);
-      setLoading(false);
+      try {
+        const response = await fetch('/api/quotes', { credentials: 'include' });
+        const data = (await response.json()) as { quotes?: QuoteListItem[]; error?: string };
+        if (!response.ok) {
+          setQuotes([]);
+          setLoadError(typeof data.error === 'string' ? data.error : 'Could not load quotes.');
+        } else {
+          setQuotes(data.quotes || []);
+        }
+      } catch {
+        setQuotes([]);
+        setLoadError('Could not load quotes.');
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -44,6 +56,24 @@ export default function QuotesPage() {
     <div className="p-8">
       <h1 className="text-3xl font-semibold text-gray-900 mb-2">My Quotes</h1>
       <p className="text-sm text-gray-600 mb-6">Review and approve your project quotes.</p>
+
+      {loadError ? (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950">
+          <p className="font-medium">Quotes could not be loaded</p>
+          <p className="mt-1 text-amber-900/90">{loadError}</p>
+          {loadError.includes('Select a client context') ? (
+            <p className="mt-3">
+              <Link
+                href="/team"
+                className="font-medium text-amber-950 underline decoration-amber-700/50 underline-offset-2"
+              >
+                Open team workspace
+              </Link>{' '}
+              and pick a client, then return here.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <table className="min-w-full divide-y divide-gray-200 text-sm">

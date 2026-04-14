@@ -1,16 +1,128 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { CreditCard } from 'lucide-react';
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const [notifyInboxLoading, setNotifyInboxLoading] = useState(true);
+  const [notifyInbox, setNotifyInbox] = useState(true);
+  const [notifyError, setNotifyError] = useState('');
+
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileSavedAt, setProfileSavedAt] = useState<number | null>(null);
   const [formData, setFormData] = useState({
-    firstName: 'Thorstein',
-    lastName: 'Nordby',
-    email: 'thorstein@nettly.no',
+    firstName: '',
+    lastName: '',
+    email: '',
   });
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/account/notification-preferences');
+        if (!res.ok) throw new Error('load failed');
+        const data = (await res.json()) as { emailNotifyInboxMessages?: boolean };
+        if (!cancelled) {
+          setNotifyInbox(data.emailNotifyInboxMessages !== false);
+        }
+      } catch {
+        if (!cancelled) {
+          setNotifyError('Could not load notification settings.');
+        }
+      } finally {
+        if (!cancelled) setNotifyInboxLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/account/profile');
+        if (res.status === 401) {
+          router.push('/login');
+          return;
+        }
+        if (!res.ok) throw new Error('load failed');
+        const data = (await res.json()) as { firstName?: string; lastName?: string; email?: string };
+        if (!cancelled) {
+          setFormData({
+            firstName: typeof data.firstName === 'string' ? data.firstName : '',
+            lastName: typeof data.lastName === 'string' ? data.lastName : '',
+            email: typeof data.email === 'string' ? data.email : '',
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setProfileError('Could not load your profile.');
+        }
+      } finally {
+        if (!cancelled) setProfileLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  const updateNotifyInbox = useCallback(async (next: boolean) => {
+    setNotifyError('');
+    const res = await fetch('/api/account/notification-preferences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emailNotifyInboxMessages: next }),
+    });
+    if (!res.ok) {
+      setNotifyError('Could not save your preference. Please try again.');
+      return;
+    }
+    setNotifyInbox(next);
+  }, []);
+
+  const saveProfile = useCallback(async () => {
+    setProfileError('');
+    setProfileSavedAt(null);
+    setProfileSaving(true);
+    try {
+      const res = await fetch('/api/account/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+        }),
+      });
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
+      if (!res.ok) {
+        setProfileError('Could not save your details. Please try again.');
+        return;
+      }
+      const data = (await res.json()) as { firstName?: string; lastName?: string; email?: string };
+      setFormData({
+        firstName: typeof data.firstName === 'string' ? data.firstName : '',
+        lastName: typeof data.lastName === 'string' ? data.lastName : '',
+        email: typeof data.email === 'string' ? data.email : formData.email,
+      });
+      setProfileSavedAt(Date.now());
+    } finally {
+      setProfileSaving(false);
+    }
+  }, [formData.firstName, formData.lastName, formData.email, router]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setProfileSavedAt(null);
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
@@ -22,11 +134,46 @@ export default function SettingsPage() {
       <h1 className="text-3xl font-semibold text-gray-900 mb-8">Settings</h1>
 
       <div className="space-y-8">
+        <section className="rounded-2xl border border-gray-200 bg-white p-8">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Notifications</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            Control whether we email you when there is new activity in your inbox threads.
+          </p>
+          {notifyError && (
+            <p className="mb-4 text-sm text-red-600" role="alert">
+              {notifyError}
+            </p>
+          )}
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-gray-300"
+              checked={notifyInbox}
+              disabled={notifyInboxLoading}
+              onChange={(e) => void updateNotifyInbox(e.target.checked)}
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-900">New inbox message emails</span>
+              <span className="mt-1 block text-sm text-gray-600">
+                When on, we send a short email when someone messages you on a project thread.
+              </span>
+            </span>
+          </label>
+        </section>
+
         {/* Person of reference */}
         <section className="rounded-2xl border border-gray-200 bg-white p-8">
           <h2 className="text-2xl font-semibold text-gray-900 mb-8">Person of reference</h2>
 
           <div className="space-y-6">
+            {profileError && (
+              <p className="text-sm text-red-600" role="alert">
+                {profileError}
+              </p>
+            )}
+            {profileSavedAt !== null && !profileError && (
+              <p className="text-sm text-gray-600">Your details were saved.</p>
+            )}
             <div>
               <h3 className="text-base font-medium text-gray-900 mb-6">Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -40,7 +187,9 @@ export default function SettingsPage() {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleChange}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                    disabled={profileLoading}
+                    autoComplete="given-name"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:cursor-not-allowed disabled:bg-gray-50"
                   />
                 </div>
                 <div>
@@ -53,7 +202,9 @@ export default function SettingsPage() {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleChange}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                    disabled={profileLoading}
+                    autoComplete="family-name"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:cursor-not-allowed disabled:bg-gray-50"
                   />
                 </div>
               </div>
@@ -68,9 +219,24 @@ export default function SettingsPage() {
                 id="email"
                 name="email"
                 value={formData.email}
-                onChange={handleChange}
-                className="w-full md:w-1/2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                readOnly
+                autoComplete="email"
+                className="w-full md:w-1/2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700"
               />
+              <p className="mt-2 text-xs text-gray-500">
+                Sign-in email is managed from your account provider; contact support if you need it changed.
+              </p>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => void saveProfile()}
+                disabled={profileLoading || profileSaving}
+                className="rounded-xl bg-gray-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {profileSaving ? 'Saving…' : 'Save details'}
+              </button>
             </div>
           </div>
         </section>

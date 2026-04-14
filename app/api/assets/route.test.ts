@@ -122,6 +122,37 @@ describe('GET /api/assets', () => {
     expect(body.has_more).toBe(false);
   });
 
+  it('returns 400 when internal staff lists assets without workspace or project scope', async () => {
+    hoisted.mockResolvePlatformRole.mockResolvedValue('project_manager');
+    hoisted.mockReadSelected.mockReturnValue(null);
+    hoisted.mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: () =>
+          Promise.resolve({ data: { user: { id: 'pm1', user_metadata: {} } }, error: null }),
+      },
+    });
+
+    const res = await GET(new NextRequest('http://localhost/api/assets'));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('Select a client context');
+  });
+
+  it('allows internal staff to list assets when project_id is set', async () => {
+    hoisted.mockResolvePlatformRole.mockResolvedValue('consultant');
+    hoisted.mockReadSelected.mockReturnValue(null);
+    hoisted.mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: () =>
+          Promise.resolve({ data: { user: { id: 'c1', user_metadata: {} } }, error: null }),
+      },
+      from: () => assetsQueryThenable({ data: [], error: null }),
+    });
+
+    const res = await GET(new NextRequest('http://localhost/api/assets?project_id=proj-1'));
+    expect(res.status).toBe(200);
+  });
+
   it('does not call customer workspace checks for internal staff', async () => {
     hoisted.mockCreateClient.mockResolvedValue({
       auth: {

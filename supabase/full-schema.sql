@@ -22,6 +22,12 @@ create table if not exists public.profiles (
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+alter table public.profiles
+  add column if not exists email_notify_inbox_messages boolean not null default true;
+
+comment on column public.profiles.email_notify_inbox_messages is
+  'When false, new inbox message emails are not sent to this user.';
+
 comment on table public.profiles is 'User profile information';
 
 -- Enable RLS

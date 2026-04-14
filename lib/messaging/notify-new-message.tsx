@@ -28,6 +28,27 @@ async function loadProfileEmails(admin: SupabaseClient, userIds: string[]) {
   return emails;
 }
 
+/** Respects `profiles.email_notify_inbox_messages` (false = opted out). */
+async function loadInboxNotifyRecipientEmails(admin: SupabaseClient, userIds: string[]) {
+  const unique = Array.from(new Set(userIds.filter(Boolean)));
+  if (unique.length === 0) return [];
+
+  const { data, error } = await admin
+    .from('profiles')
+    .select('id, email, email_notify_inbox_messages')
+    .in('id', unique);
+  if (error) throw error;
+
+  const emails: string[] = [];
+  for (const row of data ?? []) {
+    const email = typeof row.email === 'string' ? row.email.trim() : '';
+    if (!email) continue;
+    const optedIn = row.email_notify_inbox_messages !== false;
+    if (optedIn) emails.push(email);
+  }
+  return emails;
+}
+
 export type NotifyNewInboxMessageParams = {
   messageId: string;
   conversationId: string;
@@ -80,9 +101,9 @@ export async function notifyNewInboxMessage(params: NotifyNewInboxMessageParams)
 
       if (assignError) throw assignError;
       const ids = (assignments ?? []).map((a) => a.user_id as string).filter(Boolean);
-      recipientEmails = await loadProfileEmails(admin, ids);
+      recipientEmails = await loadInboxNotifyRecipientEmails(admin, ids);
     } else {
-      recipientEmails = await loadProfileEmails(admin, [params.customerUserId]);
+      recipientEmails = await loadInboxNotifyRecipientEmails(admin, [params.customerUserId]);
     }
 
     const deduped = uniqueEmailsPreservingCase(recipientEmails);

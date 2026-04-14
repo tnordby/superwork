@@ -1,5 +1,8 @@
 import Link from 'next/link';
 import { BadgeCheck, CircleOff, Users } from 'lucide-react';
+import { createClient } from '@/lib/supabase/server';
+import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
+import { isInternalStaff } from '@/lib/auth/platform-role';
 import { loadCustomersOverviewForWorkspace } from '@/lib/team/customers-overview';
 import { readSelectedWorkspaceIdFromServerCookies } from '@/lib/internal/client-context';
 
@@ -14,6 +17,15 @@ function formatCurrency(value: number): string {
 }
 
 export default async function TeamCustomersPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const platformRole = user
+    ? await resolvePlatformRole(supabase, user.id, user.user_metadata?.role)
+    : null;
+  const internal = platformRole !== null && isInternalStaff(platformRole);
+
   const selectedWorkspaceId = await readSelectedWorkspaceIdFromServerCookies();
   const { rows } = await loadCustomersOverviewForWorkspace(selectedWorkspaceId);
   const selectedCustomer = selectedWorkspaceId ? rows[0] : null;
@@ -28,6 +40,15 @@ export default async function TeamCustomersPage() {
         {selectedCustomer && (
           <div className="mt-3 inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700">
             Viewing: {selectedCustomer.name}
+          </div>
+        )}
+        {internal && !selectedWorkspaceId && (
+          <div className="mt-4 max-w-xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <p className="font-medium">All clients</p>
+            <p className="mt-1 text-amber-900/90">
+              You are seeing every customer workspace. Use the client switcher in the sidebar when you need to scope
+              quotes, projects, and other work to a single organization.
+            </p>
           </div>
         )}
       </div>

@@ -11,6 +11,11 @@ import { validateQuoteAssignee } from '@/lib/auth/quote-assignee';
 import { computeValuePricing, roundUpToNearestThousand } from '@/lib/quotes/value-pricing';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
 import { resolveCustomerWorkspaceContext } from '@/lib/account/customer-workspace-context';
+import {
+  notifyCustomerAfterQuoteApproval,
+  notifyCustomerQuoteReadyForReview,
+  notifyQuoteManagersCustomerRejected,
+} from '@/lib/quotes/quote-email-notify';
 
 const QUOTE_OPTIONAL_PRICING_COLUMNS = new Set([
   'estimated_hours_low',
@@ -64,6 +69,16 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
+    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
+
+    if (isQuoteManager(platformRole) && !selectedWorkspaceId) {
+      return NextResponse.json(
+        { error: 'Select a client context before viewing this quote.' },
+        { status: 400 }
+      );
+    }
+
     // Fetch quote
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
@@ -75,18 +90,20 @@ export async function GET(
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
     }
 
-    const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
-    const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
     if (!isQuoteManager(platformRole) && quote.user_id !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
-    if (isQuoteManager(platformRole) && selectedWorkspaceId) {
+    if (isQuoteManager(platformRole)) {
+      const workspaceId = selectedWorkspaceId;
+      if (!workspaceId) {
+        return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+      }
       const { data: quoteProject } = await supabase
         .from('projects')
         .select('workspace_id')
         .eq('id', quote.project_id)
         .maybeSingle();
-      if (!quoteProject || quoteProject.workspace_id !== selectedWorkspaceId) {
+      if (!quoteProject || quoteProject.workspace_id !== workspaceId) {
         return NextResponse.json({ error: 'Quote is outside selected client context' }, { status: 403 });
       }
     }
@@ -443,6 +460,8 @@ export async function PATCH(
       }
     }
 
+    let approvedProjectId: string | null = null;
+
     // If approved, create project (workspace + committed cost)
     if (updateData.status === 'approved') {
       const { data: projectId, error: projectError } = await supabase.rpc(
@@ -492,9 +511,45 @@ export async function PATCH(
           { status: 500 }
         );
       }
+
+      approvedProjectId = String(projectId);
     }
 
-    // TODO: Send appropriate email notifications
+    const quoteTitleForEmail = String(
+      (quote as Record<string, unknown>).title ?? (existingQuote as Record<string, unknown>).title ?? ''
+    );
+    const customerUserIdForEmail = String((existingQuote as Record<string, unknown>).user_id ?? '');
+
+    if (
+      updateData.status === 'pending_customer_approval' &&
+      existingQuote.status === 'pending_pm_review'
+    ) {
+      void notifyCustomerQuoteReadyForReview({
+        quoteId: id,
+        quoteTitle: quoteTitleForEmail,
+        customerUserId: customerUserIdForEmail,
+      });
+    }
+
+    if (
+      updateData.status === 'rejected' &&
+      existingQuote.status === 'pending_customer_approval'
+    ) {
+      const reasonRaw = updateData.rejection_reason;
+      void notifyQuoteManagersCustomerRejected({
+        quoteId: id,
+        quoteTitle: quoteTitleForEmail,
+        customerUserId: customerUserIdForEmail,
+        rejectionReason: typeof reasonRaw === 'string' ? reasonRaw : null,
+      });
+    }
+
+    if (approvedProjectId && customerUserIdForEmail) {
+      void notifyCustomerAfterQuoteApproval({
+        customerUserId: customerUserIdForEmail,
+        projectId: approvedProjectId,
+      });
+    }
 
     return NextResponse.json({ quote }, { status: 200 });
   } catch (error) {

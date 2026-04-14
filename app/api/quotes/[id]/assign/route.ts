@@ -4,6 +4,7 @@ import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff, isQuoteManager } from '@/lib/auth/platform-role';
 import { validateQuoteAssignee } from '@/lib/auth/quote-assignee';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
+import { notifyQuoteAssignee } from '@/lib/quotes/quote-email-notify';
 
 // POST - Assign consultant to quote
 export async function POST(
@@ -95,7 +96,14 @@ export async function POST(
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    // TODO: Send notification to assigned consultant
+    if (updatedQuote?.id && body.user_id) {
+      void notifyQuoteAssignee({
+        quoteId: updatedQuote.id,
+        quoteTitle:
+          typeof updatedQuote.title === 'string' ? updatedQuote.title : 'Quote',
+        assigneeUserId: body.user_id,
+      });
+    }
 
     return NextResponse.json({ quote: updatedQuote }, { status: 200 });
   } catch (error) {

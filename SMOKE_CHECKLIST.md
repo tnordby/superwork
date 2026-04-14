@@ -51,6 +51,8 @@ npm run smoke:local
 
 Same as `npm test` plus `npx tsc --noEmit`.
 
+**Playwright** (`npx playwright test` or `npm run test:e2e`): always runs the public login smoke. The **sign-in → app shell** spec runs only when `E2E_TEST_USER_EMAIL` and `E2E_TEST_USER_PASSWORD` are set — either in **`.env.e2e.local`** (create from `e2e/env.example`) or as **`E2E_*` lines in `.env.local`**. On GitHub Actions with placeholder Supabase keys, that spec is skipped by design; use real project env locally or extend the `e2e` job with secrets if you want it in CI.
+
 ---
 
 Adjust steps to match your environments (staging vs production URLs and test accounts).

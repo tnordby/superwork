@@ -27,17 +27,25 @@ export async function GET(request: NextRequest) {
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
     const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
-    // Fetch projects
-    let query = supabase
-      .from('projects')
-      .select('*')
-      .order('created_at', { ascending: false });
+    let query;
     if (isInternalStaff(platformRole)) {
-      if (selectedWorkspaceId) {
-        query = query.eq('workspace_id', selectedWorkspaceId);
+      if (!selectedWorkspaceId) {
+        return NextResponse.json(
+          { error: 'Select a client context before listing projects.' },
+          { status: 400 }
+        );
       }
+      query = supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .eq('workspace_id', selectedWorkspaceId);
     } else {
-      query = query.eq('user_id', user.id);
+      query = supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .eq('user_id', user.id);
     }
     const { data: projects, error } = await query;
 

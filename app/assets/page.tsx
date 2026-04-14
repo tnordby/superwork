@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import { Upload, FileText, Image as ImageIcon, File, Download, Trash2, Search, FolderOpen, Loader2 } from 'lucide-react';
 import { Asset, Workspace, AssetCategory } from '@/types/assets';
 
@@ -82,6 +83,7 @@ export default function AssetsPage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [hoveredAssetId, setHoveredAssetId] = useState<string | null>(null);
   const [viewingClientName, setViewingClientName] = useState<string | null>(null);
+  const [assetsLoadError, setAssetsLoadError] = useState<string | null>(null);
   const dragDepth = useRef(0);
 
   const loadWorkspaces = useCallback(async () => {
@@ -98,6 +100,7 @@ export default function AssetsPage() {
 
   const loadAssets = useCallback(async () => {
     setIsLoading(true);
+    setAssetsLoadError(null);
     try {
       const params = new URLSearchParams();
       if (selectedWorkspace) {
@@ -110,15 +113,23 @@ export default function AssetsPage() {
       const response = await fetch(`/api/assets?${params.toString()}`, {
         credentials: 'include',
       });
+      const data = (await response.json().catch(() => ({}))) as {
+        assets?: Asset[];
+        error?: string;
+      };
       if (response.ok) {
-        const data = await response.json();
         setAssets(data.assets || []);
       } else {
-        const body = await response.json().catch(() => ({}));
-        console.error('Failed to load assets', response.status, body);
+        setAssets([]);
+        setAssetsLoadError(
+          typeof data.error === 'string' ? data.error : 'Could not load assets.'
+        );
+        console.error('Failed to load assets', response.status, data);
       }
     } catch (error) {
       console.error('Failed to load assets:', error);
+      setAssets([]);
+      setAssetsLoadError('Could not load assets.');
     } finally {
       setIsLoading(false);
     }
@@ -169,21 +180,31 @@ export default function AssetsPage() {
         return;
       }
 
-      const response = await fetch(
-        `/api/assets/categories?workspace_id=${selectedWorkspace}`,
-        { credentials: 'include' }
-      );
+      try {
+        const response = await fetch(
+          `/api/assets/categories?workspace_id=${selectedWorkspace}`,
+          { credentials: 'include' }
+        );
 
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        console.error('Failed to load asset categories', response.status, body);
-        return;
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          console.error('Failed to load asset categories', response.status, body);
+          if (!active) return;
+          setAssetCategories([]);
+          setSelectedCategory('');
+          return;
+        }
+
+        const data = await response.json();
+        if (!active) return;
+        setAssetCategories(data.categories || []);
+        setSelectedCategory('');
+      } catch (error) {
+        console.error('Failed to load asset categories:', error);
+        if (!active) return;
+        setAssetCategories([]);
+        setSelectedCategory('');
       }
-
-      const data = await response.json();
-      if (!active) return;
-      setAssetCategories(data.categories || []);
-      setSelectedCategory('');
     }
 
     loadCategories();
@@ -361,6 +382,31 @@ export default function AssetsPage() {
           </div>
         )}
       </div>
+
+      {assetsLoadError && !isLoading ? (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950">
+          <p className="font-medium">Assets could not be loaded</p>
+          <p className="mt-1 text-amber-900/90">{assetsLoadError}</p>
+          {assetsLoadError.includes('Select a client context') ? (
+            <p className="mt-3">
+              <Link
+                href="/team"
+                className="font-medium text-amber-950 underline decoration-amber-700/50 underline-offset-2"
+              >
+                Open team workspace
+              </Link>{' '}
+              and choose a client (or pick a workspace above), then retry.
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void loadAssets()}
+            className="mt-4 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100/80"
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       {/* Workspace Selector */}
       {workspaces.length > 0 && (

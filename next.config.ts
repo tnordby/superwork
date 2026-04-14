@@ -1,8 +1,13 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Avoid inferring a parent directory as the app root when another lockfile exists above this repo.
+  outputFileTracingRoot: projectRoot,
 };
 
 export default withSentryConfig(nextConfig, {

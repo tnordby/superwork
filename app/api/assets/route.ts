@@ -39,6 +39,20 @@ export async function GET(request: NextRequest) {
       Math.max(1, parseInt(searchParams.get('page_size') || '50', 10) || 50)
     );
 
+    if (isInternalStaff(platformRole)) {
+      const hasWorkspaceParam = typeof workspace_id === 'string' && workspace_id.trim() !== '';
+      const hasProjectParam = typeof project_id === 'string' && project_id.trim() !== '';
+      if (!selectedWorkspaceId && !hasWorkspaceParam && !hasProjectParam) {
+        return NextResponse.json(
+          {
+            error:
+              'Select a client context before listing assets, or pass workspace_id or project_id.',
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // 3. Build query (no aggregate count — avoids PostgREST/RLS issues; UI lists current page only)
     let query = supabase.from('assets').select('*').order('created_at', { ascending: false });
 

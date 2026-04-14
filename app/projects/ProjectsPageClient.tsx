@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -47,6 +47,7 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
   const [projects, setProjects] = useState<Project[]>([]);
   const [serviceTemplates] = useState<ProjectsBrowseServiceRow[]>(initialServiceTemplates);
   const [loading, setLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [viewingClientName, setViewingClientName] = useState<string | null>(null);
 
@@ -66,26 +67,36 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
     void loadContext();
   }, []);
 
-  // Fetch user's projects
-  useEffect(() => {
-    async function fetchProjects() {
-      try {
-        const response = await fetch('/api/projects');
-        const data = await response.json();
-        if (response.ok) {
-          setProjects(data.projects || []);
-        }
-      } catch (error) {
-        console.error('Error fetching projects:', error);
-      } finally {
-        setLoading(false);
+  const fetchMyProjects = useCallback(async () => {
+    setProjectsError(null);
+    setLoading(true);
+    try {
+      const response = await fetch('/api/projects', { credentials: 'include' });
+      const data = (await response.json()) as { projects?: Project[]; error?: string };
+      if (response.ok) {
+        setProjects(data.projects || []);
+      } else {
+        setProjects([]);
+        setProjectsError(
+          typeof data.error === 'string' ? data.error : 'Could not load projects.'
+        );
       }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setProjects([]);
+      setProjectsError('Could not load projects.');
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
+  useEffect(() => {
     if (activeTab === 'my-projects') {
-      fetchProjects();
+      void fetchMyProjects();
+    } else {
+      setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, fetchMyProjects]);
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -345,6 +356,29 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
         <div>
           {loading ? (
             <div className="text-center py-12 text-gray-500">Loading projects...</div>
+          ) : projectsError ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-6 text-sm text-amber-950">
+              <p className="font-medium text-amber-950">Projects could not be loaded</p>
+              <p className="mt-2 text-amber-900/90">{projectsError}</p>
+              {projectsError.includes('Select a client context') ? (
+                <p className="mt-3">
+                  <Link
+                    href="/team"
+                    className="font-medium text-amber-950 underline decoration-amber-700/50 underline-offset-2 hover:decoration-amber-950"
+                  >
+                    Open team workspace
+                  </Link>{' '}
+                  and choose a client in the sidebar, then try again.
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void fetchMyProjects()}
+                className="mt-4 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100/80"
+              >
+                Retry
+              </button>
+            </div>
           ) : projects.length === 0 ? (
             <div className="text-center py-12">
               <div className="rounded-2xl border-2 border-dashed border-gray-300 p-12">

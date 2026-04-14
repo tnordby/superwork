@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff, isQuoteManager } from '@/lib/auth/platform-role';
 import { readSelectedWorkspaceIdFromRequest } from '@/lib/internal/client-context';
+import { notifyQuoteManagersNewQuoteRequest } from '@/lib/quotes/quote-email-notify';
 
 // GET - List quotes (filtered by role)
 export async function GET(request: NextRequest) {
@@ -22,12 +23,15 @@ export async function GET(request: NextRequest) {
     const platformRole = await resolvePlatformRole(supabase, user.id, user.user_metadata?.role);
     const selectedWorkspaceId = readSelectedWorkspaceIdFromRequest(request);
 
-    let query = supabase
-      .from('quotes')
-      .select('*')
-      .order('created_at', { ascending: false });
+    let query;
 
-    if (isQuoteManager(platformRole) && selectedWorkspaceId) {
+    if (isQuoteManager(platformRole)) {
+      if (!selectedWorkspaceId) {
+        return NextResponse.json(
+          { error: 'Select a client context before listing quotes.' },
+          { status: 400 }
+        );
+      }
       const { data: workspaceProjects, error: workspaceProjectsError } = await supabase
         .from('projects')
         .select('id')
@@ -36,9 +40,20 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: workspaceProjectsError.message }, { status: 500 });
       }
       const projectIds = (workspaceProjects || []).map((project: { id: string }) => project.id);
-      query = query.in('project_id', projectIds);
-    } else if (!isQuoteManager(platformRole)) {
-      query = query.eq('user_id', user.id);
+      if (projectIds.length === 0) {
+        return NextResponse.json({ quotes: [] }, { status: 200 });
+      }
+      query = supabase
+        .from('quotes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .in('project_id', projectIds);
+    } else {
+      query = supabase
+        .from('quotes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .eq('user_id', user.id);
     }
 
     const { data: quotes, error } = await query;
@@ -178,7 +193,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // TODO: Send notification to PM about new quote request
+    if (quote?.id) {
+      void notifyQuoteManagersNewQuoteRequest({
+        quoteId: quote.id,
+        quoteTitle: typeof quote.title === 'string' ? quote.title : String(body.title || ''),
+        submittedByUserId: user.id,
+      });
+    }
 
     return NextResponse.json({ quote }, { status: 201 });
   } catch (error) {
