@@ -10,6 +10,40 @@ import {
 } from '@/lib/internal/client-context';
 import { tryCreateServiceRoleClient } from '@/lib/supabase/admin';
 
+async function resolveCustomerWorkspaceIdWithRls(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data: ownedWorkspace, error: ownedError } = await supabase
+    .from('workspaces')
+    .select('id')
+    .eq('owner_id', userId)
+    .eq('type', 'client')
+    .order('created_at', { ascending: true })
+    .maybeSingle();
+
+  if (ownedError) {
+    return { error: ownedError.message, status: 500 as const };
+  }
+  if (ownedWorkspace?.id) {
+    return { workspaceId: ownedWorkspace.id };
+  }
+
+  const { data: memberWorkspace, error: memberError } = await supabase
+    .from('workspace_members')
+    .select('workspace_id')
+    .eq('user_id', userId)
+    .order('invited_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (memberError) {
+    return { error: memberError.message, status: 500 as const };
+  }
+  if (!memberWorkspace?.workspace_id) {
+    return { error: 'Workspace not found', status: 404 as const };
+  }
+
+  return { workspaceId: memberWorkspace.workspace_id as string };
+}
+
 // GET - Fetch all projects for the logged-in user
 export async function GET(request: NextRequest) {
   try {
@@ -172,14 +206,33 @@ export async function POST(request: NextRequest) {
     }
 
     const ctx = await resolveCustomerWorkspaceContext(user.id);
+    let customerWorkspaceId: string;
+    let customerProjectClient: typeof supabase;
     if ('error' in ctx) {
-      return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+      // Keep customer project creation available in local/dev environments
+      // where service-role credentials may be intentionally absent.
+      if (ctx.status === 503) {
+        const fallback = await resolveCustomerWorkspaceIdWithRls(supabase, user.id);
+        if ('error' in fallback) {
+          return NextResponse.json({ error: fallback.error }, { status: fallback.status });
+        }
+        customerWorkspaceId = fallback.workspaceId;
+        customerProjectClient = supabase;
+      } else {
+        return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+      }
+    } else {
+      customerWorkspaceId = ctx.workspace.id;
+      customerProjectClient = ctx.admin;
     }
 
-    const { workspace, admin } = ctx;
     const requestedTeamId = typeof team_id === 'string' && team_id.trim() ? team_id.trim() : null;
     if (requestedTeamId) {
-      const v = await validateTeamBelongsToWorkspace(admin, requestedTeamId, workspace.id);
+      const v = await validateTeamBelongsToWorkspace(
+        customerProjectClient,
+        requestedTeamId,
+        customerWorkspaceId
+      );
       if (!v.ok) {
         return NextResponse.json({ error: v.message }, { status: 400 });
       }
@@ -187,7 +240,7 @@ export async function POST(request: NextRequest) {
 
     const projectData: Record<string, unknown> = {
       user_id: user.id,
-      workspace_id: workspace.id,
+      workspace_id: customerWorkspaceId,
       name,
       description: description || null,
       category,
@@ -202,7 +255,11 @@ export async function POST(request: NextRequest) {
       projectData.service_template_id = service_template_id;
     }
 
-    const { data: project, error } = await admin.from('projects').insert(projectData).select().single();
+    const { data: project, error } = await customerProjectClient
+      .from('projects')
+      .insert(projectData)
+      .select()
+      .single();
 
     if (error) {
       console.error('Error creating project:', error);
@@ -211,7 +268,7 @@ export async function POST(request: NextRequest) {
 
     if (service_template_id && project) {
       try {
-        await admin.rpc('instantiate_project_from_template', {
+        await customerProjectClient.rpc('instantiate_project_from_template', {
           project_id_param: project.id,
           service_template_id_param: service_template_id,
         });
