@@ -476,7 +476,7 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
           value={formData.service_type}
           onChange={(e) => setFormData({ ...formData, service_type: e.target.value })}
           className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
-          placeholder="e.g., CRM implementation"
+          placeholder="e.g., HubSpot CRM Onboarding"
         />
       </div>
 

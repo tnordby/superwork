@@ -145,8 +145,8 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
           gradient: 'from-lime-400 to-green-500'
         },
         {
-          name: 'CRM implementation',
-          description: 'Custom setup of objects, data model, and user permissions',
+          name: 'HubSpot CRM Onboarding',
+          description: 'Configure CRM foundations: objects, properties, pipelines, and team-ready defaults',
           icon: Database,
           gradient: 'from-green-500 to-emerald-600'
         },

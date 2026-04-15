@@ -26,6 +26,9 @@ async function loadBrowseServiceTemplates(): Promise<ProjectsBrowseServiceRow[]>
       if (normalized === 'crm migration' || normalized === 'hubspot crm') {
         return 'HubSpot CRM Migration';
       }
+      if (normalized === 'crm implementation') {
+        return 'HubSpot CRM Onboarding';
+      }
       return name;
     };
 
@@ -54,11 +57,14 @@ async function loadBrowseServiceTemplates(): Promise<ProjectsBrowseServiceRow[]>
     // that could impact foreign keys (projects.service_template_id, service_sops, etc).
     const deduped: ProjectsBrowseServiceRow[] = [];
     const seen = new Map<string, number>();
+    const originalNameByDedupeKey = new Map<string, string>();
     const getTemplatePriority = (originalName: string): number => {
       const normalized = originalName.trim().toLowerCase();
       if (normalized === 'hubspot crm') return 3;
       if (normalized === 'hubspot crm migration') return 2;
       if (normalized === 'crm migration') return 1;
+      if (normalized === 'hubspot crm onboarding') return 3;
+      if (normalized === 'crm implementation') return 1;
       return 0;
     };
     for (const row of rows) {
@@ -66,6 +72,7 @@ async function loadBrowseServiceTemplates(): Promise<ProjectsBrowseServiceRow[]>
       const existingIndex = seen.get(key);
       if (existingIndex === undefined) {
         seen.set(key, deduped.length);
+        originalNameByDedupeKey.set(key, row.originalName);
         deduped.push({
           id: row.id,
           name: row.name,
@@ -77,10 +84,11 @@ async function loadBrowseServiceTemplates(): Promise<ProjectsBrowseServiceRow[]>
         continue;
       }
 
-      const existing = deduped[existingIndex];
-      const existingPriority = getTemplatePriority(existing.name);
+      const existingOriginal = originalNameByDedupeKey.get(key) ?? '';
+      const existingPriority = getTemplatePriority(existingOriginal);
       const nextPriority = getTemplatePriority(row.originalName);
       if (nextPriority > existingPriority) {
+        originalNameByDedupeKey.set(key, row.originalName);
         deduped[existingIndex] = {
           id: row.id,
           name: row.name,
