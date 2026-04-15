@@ -29,6 +29,9 @@ async function loadBrowseServiceTemplates(): Promise<ProjectsBrowseServiceRow[]>
       if (normalized === 'crm implementation') {
         return 'HubSpot CRM Onboarding';
       }
+      if (normalized === 'hubspot commerce onboarding') {
+        return 'HubSpot Commerce Hub Onboarding';
+      }
       return name;
     };
 
@@ -65,6 +68,8 @@ async function loadBrowseServiceTemplates(): Promise<ProjectsBrowseServiceRow[]>
       if (normalized === 'crm migration') return 1;
       if (normalized === 'hubspot crm onboarding') return 3;
       if (normalized === 'crm implementation') return 1;
+      if (normalized === 'hubspot commerce hub onboarding') return 3;
+      if (normalized === 'hubspot commerce onboarding') return 1;
       return 0;
     };
     for (const row of rows) {

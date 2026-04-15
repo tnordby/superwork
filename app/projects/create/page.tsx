@@ -61,6 +61,7 @@ function CreateProjectForm() {
   const [error, setError] = useState('');
   const [serviceTemplate, setServiceTemplate] = useState<ServiceTemplate | null>(null);
   const [templateLoading, setTemplateLoading] = useState(false);
+  const [intakeFormCheckLoading, setIntakeFormCheckLoading] = useState(false);
   const [intakeResponses, setIntakeResponses] = useState<IntakeResponseMap | null>(null);
   const [hasIntakeForm, setHasIntakeForm] = useState(false);
   const [workspaceTeams, setWorkspaceTeams] = useState<{ id: string; name: string }[]>([]);
@@ -73,49 +74,41 @@ function CreateProjectForm() {
     const templateId = searchParams.get('templateId');
 
     if (templateId) {
-      console.log('Fetching template with ID:', templateId);
+      setHasIntakeForm(false);
       setTemplateLoading(true);
-      fetch(`/api/services/${templateId}`)
-        .then(res => res.json())
-        .then(data => {
-          console.log('Template data received:', data);
-          if (data.template) {
-            setServiceTemplate(data.template);
-            console.log('Service template set:', data.template.name);
-            setFormData(prev => ({
-              ...prev,
-              category: data.template.category,
-              service_type: data.template.name,
-            }));
+      setIntakeFormCheckLoading(true);
 
-            // Check if this service has an intake form
-            console.log('About to fetch intake form for template:', templateId);
-            fetch(`/api/services/${templateId}/intake-form`)
-              .then(res => {
-                console.log('Intake form response status:', res.status);
-                return res.json();
-              })
-              .then(intakeData => {
-                console.log('Intake form data received:', intakeData);
-                if (intakeData.fields && intakeData.fields.length > 0) {
-                  console.log('✅ Setting hasIntakeForm to true, fields:', intakeData.fields.length);
-                  setHasIntakeForm(true);
-                } else {
-                  console.log('❌ No intake form fields found');
-                }
-              })
-              .catch(err => {
-                console.error('❌ Error checking intake form:', err);
-                console.error('Error details:', err.message);
-              });
-          } else {
-            console.error('No template in response:', data);
+      const loadTemplateAndIntake = async () => {
+        try {
+          const templateRes = await fetch(`/api/services/${templateId}`);
+          const templateData = await templateRes.json();
+
+          if (!templateData.template) {
+            return;
           }
-        })
-        .catch(err => console.error('Error fetching template:', err))
-        .finally(() => setTemplateLoading(false));
+
+          setServiceTemplate(templateData.template);
+          setFormData((prev) => ({
+            ...prev,
+            category: templateData.template.category,
+            service_type: templateData.template.name,
+          }));
+
+          const intakeRes = await fetch(`/api/services/${templateId}/intake-form`);
+          const intakeData = await intakeRes.json();
+          const hasFields = Array.isArray(intakeData.fields) && intakeData.fields.length > 0;
+          setHasIntakeForm(hasFields);
+        } catch (loadError) {
+          console.error('Error loading template/intake form:', loadError);
+        } finally {
+          setTemplateLoading(false);
+          setIntakeFormCheckLoading(false);
+        }
+      };
+
+      void loadTemplateAndIntake();
     } else {
-      console.log('No templateId in URL params');
+      setIntakeFormCheckLoading(false);
     }
   }, [searchParams]);
 
@@ -519,7 +512,7 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
     </form>
   );
 
-  if (templateLoading) {
+  if (templateLoading || intakeFormCheckLoading) {
     return (
       <div className="p-8 max-w-3xl mx-auto">
         <div className="flex items-center justify-center py-12">
@@ -587,16 +580,10 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
         ) : null}
 
         {(() => {
-          console.log('🔍 Rendering form. serviceTemplate:', serviceTemplate);
-          console.log('🔍 serviceTemplate name:', serviceTemplate?.name);
-          console.log('🔍 Has intake form:', hasIntakeForm);
-
           const isMarketingHub = isMarketingOnboardingService(serviceTemplate?.name);
-          console.log('🔍 Is Marketing Hub:', isMarketingHub);
 
           // Use dynamic intake form if available (and not Marketing Hub which has custom form)
           if (hasIntakeForm && !isMarketingHub && serviceTemplate) {
-            console.log('✅ Rendering DynamicIntakeForm');
             return (
               <DynamicIntakeForm
                 serviceTemplateId={serviceTemplate.id}
@@ -606,7 +593,6 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
             );
           }
 
-          console.log('⚠️ Rendering fallback form:', isMarketingHub ? 'Marketing Hub' : 'Generic');
           return isMarketingHub ? renderMarketingHubForm() : renderGenericForm();
         })()}
       </div>

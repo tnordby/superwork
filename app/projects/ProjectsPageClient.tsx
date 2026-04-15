@@ -133,7 +133,7 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
       color: 'bg-[#bfe937]',
       projects: [
         {
-          name: 'HubSpot Commerce Onboarding',
+          name: 'HubSpot Commerce Hub Onboarding',
           description: 'Launch Commerce Hub with products, quotes, subscriptions, and payments',
           icon: CreditCard,
           gradient: 'from-emerald-400 to-teal-600'

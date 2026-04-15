@@ -12,6 +12,10 @@ Copy this, fill it out, and send it back.
 - Category:
 - Existing service template ID (if known):
 - New service or existing service update? (`new` / `update`):
+- Intake form required for this service? (`yes` / `no`):
+- For updates, confirm identity using at least one:
+  - Existing service template ID, or
+  - exact service name + category
 
 ## 2) Brief goal
 
@@ -35,6 +39,7 @@ Field:
 - help_text: optional
 - default_value: optional
 - validation: optional JSON (example: {"min":1,"max":100})
+- remove_existing_fields_not_listed: true | false (optional, for updates)
 ```
 
 ## 4) Conditional logic (optional)
@@ -47,6 +52,8 @@ Condition:
 - trigger_value: exact value
 - action: show | hide
 - target_field_names: [field_key_1, field_key_2]
+- condition_order: 1 (optional)
+- match_type: all | any (optional, for grouped conditions)
 ```
 
 ## 5) Output formatting notes (optional)
@@ -54,6 +61,7 @@ Condition:
 - Any special way responses should be formatted in project description?
 - Any fields that should always appear at the top?
 - Any labels/wording you want adjusted for tone?
+- If formatting notes are required, should implementation block rollout until formatting is wired? (`yes` / `no`)
 
 ## 6) SOP/task behavior
 
@@ -65,6 +73,12 @@ Condition:
 - Apply to production now? (`yes` / `no`)
 - Safe to overwrite existing intake fields for this service? (`yes` / `no`)
 - Keep old fields and only append new ones? (`yes` / `no`)
+
+## 8) Validation checklist
+
+- Confirm `/projects` card links to `/projects/create` with the expected `templateId` (`yes` / `no`)
+- Confirm intake fields render in `/projects/create` for this service (`yes` / `no`)
+- Confirm `project_intake_responses` persists after project creation (`yes` / `no`)
 
 ---
 
