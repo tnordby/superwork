@@ -889,9 +889,6 @@ export default function ProjectDetailPage() {
                       </option>
                     ))}
                   </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Links this project&apos;s spend to a team envelope on Account → Teams.
-                  </p>
                 </div>
               ) : null}
 

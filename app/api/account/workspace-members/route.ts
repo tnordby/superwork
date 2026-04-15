@@ -9,27 +9,14 @@ type MemberRow = {
   role: WorkspaceMembershipRole;
   invited_at: string;
   accepted_at: string | null;
-  profiles:
-    | {
-        id: string;
-        first_name: string | null;
-        last_name: string | null;
-        email: string | null;
-      }
-    | {
-        id: string;
-        first_name: string | null;
-        last_name: string | null;
-        email: string | null;
-      }[]
-    | null;
 };
 
-function normalizeProfile(profile: MemberRow['profiles']) {
-  if (!profile) return null;
-  if (Array.isArray(profile)) return profile[0] ?? null;
-  return profile;
-}
+type ProfileRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+};
 
 type MemberResponseRow = {
   user_id: string;
@@ -65,9 +52,7 @@ export async function GET() {
 
     const { data: members, error: membersError } = await admin
       .from('workspace_members')
-      .select(
-        'user_id, role, invited_at, accepted_at, profiles!workspace_members_user_id_fkey(id, first_name, last_name, email)'
-      )
+      .select('user_id, role, invited_at, accepted_at')
       .eq('workspace_id', workspace.id)
       .order('invited_at', { ascending: false });
 
@@ -75,8 +60,27 @@ export async function GET() {
       return NextResponse.json({ error: membersError.message }, { status: 500 });
     }
 
-    const rows: MemberResponseRow[] = ((members || []) as unknown as MemberRow[]).map((member) => {
-      const profile = normalizeProfile(member.profiles);
+    const memberRows = (members || []) as unknown as MemberRow[];
+    const memberIds = memberRows.map((member) => member.user_id).filter(Boolean);
+    const profilesById = new Map<string, ProfileRow>();
+
+    if (memberIds.length > 0) {
+      const { data: profiles, error: profilesError } = await admin
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', memberIds);
+
+      if (profilesError) {
+        return NextResponse.json({ error: profilesError.message }, { status: 500 });
+      }
+
+      for (const profile of (profiles || []) as ProfileRow[]) {
+        profilesById.set(profile.id, profile);
+      }
+    }
+
+    const rows: MemberResponseRow[] = memberRows.map((member) => {
+      const profile = profilesById.get(member.user_id) ?? null;
       const first = profile?.first_name?.trim() || '';
       const last = profile?.last_name?.trim() || '';
       const fullName = `${first} ${last}`.trim();

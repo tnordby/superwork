@@ -28,7 +28,6 @@ import {
   Grid3x3,
   FolderKanban,
   Shield,
-  Zap,
   ClipboardList,
 } from 'lucide-react';
 import { normalizePlatformRole, isAdmin as isAdminRole, isQuoteManager } from '@/lib/auth/platform-role';
@@ -84,7 +83,6 @@ const customerAccountSection: ExpandableNavItem = {
     { label: 'Members', href: '/account/members', icon: Users },
     { label: 'Teams', href: '/account/teams', icon: FolderTree },
     { label: 'Settings', href: '/account/settings', icon: Settings },
-    { label: 'Integrations', href: '/integrations', icon: Zap },
   ],
 };
 
@@ -246,7 +244,7 @@ export function Sidebar() {
             </div>
           ) : (
             <>
-              <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex min-w-0 items-center gap-2">
                 <Image
                   src="/superwork-logo-white.svg"
                   alt="Superwork"
@@ -255,6 +253,9 @@ export function Sidebar() {
                   priority
                   className="max-w-[140px]"
                 />
+                <span className="inline-flex items-center rounded-full bg-[#bfe937] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-black">
+                  Beta
+                </span>
               </div>
               <button
                 onClick={() => setIsCollapsed(!isCollapsed)}

@@ -278,29 +278,6 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Bank accounts */}
-        <section className="rounded-2xl border border-gray-200 bg-white p-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-8">Bank accounts</h2>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">
-                Contact <a href="mailto:payment@superwork.co" className="text-blue-600 hover:underline">payment@superwork.co</a>
-              </p>
-              <p className="text-sm text-gray-600">if you want to disconnect a bank account</p>
-            </div>
-
-            <div className="lg:col-span-2">
-              <h3 className="text-base font-semibold text-gray-900 mb-4">
-                Connecting a bank account is easy and secure
-              </h3>
-
-              <button className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
-                Add account
-              </button>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
   );
