@@ -263,7 +263,16 @@ export default function TeamsPage() {
       </div>
 
       {error ? (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="mt-2 font-medium underline underline-offset-2"
+          >
+            Retry
+          </button>
+        </div>
       ) : null}
 
       {teamSpendCostColumnMissing ? (

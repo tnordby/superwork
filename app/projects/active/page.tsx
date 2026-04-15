@@ -9,6 +9,7 @@ export default function ActiveProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
   const [viewingClientName, setViewingClientName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,8 +30,10 @@ export default function ActiveProjectsPage() {
 
   useEffect(() => {
     async function fetchProjects() {
+      setError('');
+      setLoading(true);
       try {
-        const response = await fetch('/api/projects');
+        const response = await fetch('/api/projects', { credentials: 'include' });
         const data = await response.json();
 
         if (!response.ok) {
@@ -45,8 +48,8 @@ export default function ActiveProjectsPage() {
       }
     }
 
-    fetchProjects();
-  }, []);
+    void fetchProjects();
+  }, [reloadToken]);
 
   const getStatusConfig = (status: ProjectStatus) => {
     switch (status) {
@@ -75,12 +78,36 @@ export default function ActiveProjectsPage() {
   }
 
   if (error) {
+    const needsClientContext = error.includes('Select a client context');
     return (
       <div className="p-8">
         <div className="text-center py-12">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Error loading projects</h3>
-          <p className="text-sm text-gray-600">{error}</p>
+          <p className="text-sm text-gray-600 mb-4">{error}</p>
+          {needsClientContext ? (
+            <p className="text-sm text-gray-600 mb-4">
+              <Link href="/team" className="font-medium text-gray-900 underline underline-offset-2">
+                Open team workspace
+              </Link>{' '}
+              and select a client, then retry.
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setReloadToken((value) => value + 1)}
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Retry
+          </button>
+          <div className="mt-4">
+            <Link
+              href="/projects"
+              className="text-sm text-gray-600 hover:text-gray-900 underline underline-offset-2"
+            >
+              Back to all projects
+            </Link>
+          </div>
         </div>
       </div>
     );

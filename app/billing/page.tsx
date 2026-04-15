@@ -30,10 +30,14 @@ export default function BillingPage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const [managingBilling, setManagingBilling] = useState(false);
   const router = useRouter();
 
   const fetchBillingData = useCallback(async () => {
+    setLoadError(null);
+    setLoading(true);
     try {
       const workspaceId = localStorage.getItem('currentWorkspaceId');
 
@@ -42,15 +46,22 @@ export default function BillingPage() {
         return;
       }
 
-      const response = await fetch(`/api/billing/workspace?workspaceId=${workspaceId}`);
+      const response = await fetch(`/api/billing/workspace?workspaceId=${workspaceId}`, {
+        credentials: 'include',
+      });
+      const data = await response.json().catch(() => null);
 
-      if (response.ok) {
-        const data = await response.json();
-        setWorkspace(data.workspace);
-        setInvoices(data.invoices || []);
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to load billing information');
       }
+
+      setWorkspace(data.workspace);
+      setInvoices(data.invoices || []);
     } catch (error) {
       console.error('Error fetching billing data:', error);
+      setWorkspace(null);
+      setInvoices([]);
+      setLoadError(error instanceof Error ? error.message : 'Failed to load billing information.');
     } finally {
       setLoading(false);
     }
@@ -58,7 +69,7 @@ export default function BillingPage() {
 
   useEffect(() => {
     void fetchBillingData();
-  }, [fetchBillingData]);
+  }, [fetchBillingData, reloadToken]);
 
   const handleManageBilling = async () => {
     if (!workspace?.id) return;
@@ -68,6 +79,7 @@ export default function BillingPage() {
     try {
       const response = await fetch('/api/stripe/create-portal-session', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -76,11 +88,12 @@ export default function BillingPage() {
         }),
       });
 
+      const data = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error('Failed to create portal session');
+        throw new Error(data?.error || 'Failed to create portal session');
       }
 
-      const { url } = await response.json();
+      const { url } = data as { url?: string };
 
       if (url) {
         window.location.href = url;
@@ -99,6 +112,33 @@ export default function BillingPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading billing information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12 px-4">
+        <div className="mx-auto max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 p-6">
+          <h2 className="text-lg font-semibold text-amber-950">Billing is unavailable right now</h2>
+          <p className="mt-2 text-sm text-amber-900/90">{loadError}</p>
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setReloadToken((value) => value + 1)}
+              className="rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100/80"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/')}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Back to dashboard
+            </button>
+          </div>
         </div>
       </div>
     );

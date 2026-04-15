@@ -20,6 +20,7 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   async function loadMembers() {
     setLoading(true);
@@ -41,7 +42,7 @@ export default function MembersPage() {
 
   useEffect(() => {
     void loadMembers();
-  }, []);
+  }, [reloadToken]);
 
   async function handleInvite() {
     const email = emailInput.trim().toLowerCase();
@@ -92,6 +93,13 @@ export default function MembersPage() {
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-semibold text-gray-900">All members ({members.length})</h1>
+        <button
+          type="button"
+          onClick={() => setReloadToken((value) => value + 1)}
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Refresh
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -185,7 +193,18 @@ export default function MembersPage() {
                   You need admin permissions to invite colleagues.
                 </p>
               )}
-              {error && <p className="text-xs text-red-600">{error}</p>}
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  <p>{error}</p>
+                  <button
+                    type="button"
+                    onClick={() => setReloadToken((value) => value + 1)}
+                    className="mt-2 font-medium underline underline-offset-2"
+                  >
+                    Retry loading members
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

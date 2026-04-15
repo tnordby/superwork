@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Paperclip, MoreVertical } from 'lucide-react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { useSidebar } from '@/components/SidebarContext';
@@ -51,6 +52,8 @@ function InboxPageContent() {
   const [sending, setSending] = useState(false);
   const [creatingConversation, setCreatingConversation] = useState(false);
   const [options, setOptions] = useState<ConversationOption[]>([]);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [reloadConversationsToken, setReloadConversationsToken] = useState(0);
   const [selectedProjectForNew, setSelectedProjectForNew] = useState<string>('');
   const [selectedContactForNew, setSelectedContactForNew] = useState<string>('');
   const [extraParticipantsInput, setExtraParticipantsInput] = useState('');
@@ -102,18 +105,23 @@ function InboxPageContent() {
   useEffect(() => {
     async function loadOptions() {
       if (authLoading || !user) return;
+      setOptionsError(null);
       try {
         const res = await fetch('/api/conversations/options');
-        if (!res.ok) throw new Error('Failed to load options');
-        const data = await res.json();
-        const loaded: ConversationOption[] = data.options ?? [];
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error || 'Failed to load options');
+        const loaded: ConversationOption[] = data?.options ?? [];
         setOptions(loaded);
       } catch (e) {
         console.error(e);
+        const message =
+          e instanceof Error ? e.message : 'Unable to load conversation setup options.';
+        setOptionsError(message);
+        setOptions([]);
       }
     }
 
-    loadOptions();
+    void loadOptions();
   }, [authLoading, user]);
 
   useEffect(() => {
@@ -171,8 +179,8 @@ function InboxPageContent() {
       }
     }
 
-    loadConversations();
-  }, [authLoading, user, projectId, consultantName]);
+    void loadConversations();
+  }, [authLoading, user, projectId, consultantName, reloadConversationsToken]);
 
   useEffect(() => {
     setExtraParticipantsInput('');
@@ -296,6 +304,11 @@ function InboxPageContent() {
     }
   };
 
+  const contextError =
+    error?.includes('client context') ||
+    error?.includes('outside selected client context') ||
+    optionsError?.includes('client context');
+
   return (
     <InboxShell>
       <div className="h-full flex">
@@ -314,6 +327,9 @@ function InboxPageContent() {
               <p className="mt-1 text-xs text-gray-600">
                 Pick a project, then a contact. If no one is assigned yet, choose {DEFAULT_TEAM_CONTACT_NAME}.
               </p>
+              {optionsError && (
+                <p className="mt-2 text-xs text-red-700">{optionsError}</p>
+              )}
 
               <label className="mt-4 mb-1 block text-xs font-medium text-gray-700">Project</label>
               <select
@@ -377,6 +393,21 @@ function InboxPageContent() {
             {error && (
               <div className="p-4 text-sm text-red-700 border-b border-red-100 bg-red-50">
                 {error}
+                {contextError ? (
+                  <p className="mt-2 text-xs text-red-800">
+                    <Link href="/team" className="underline underline-offset-2 font-medium">
+                      Open team workspace
+                    </Link>{' '}
+                    and choose a client, then retry.
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setReloadConversationsToken((value) => value + 1)}
+                  className="mt-3 inline-flex rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100/40"
+                >
+                  Retry
+                </button>
               </div>
             )}
 

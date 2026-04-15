@@ -12,6 +12,7 @@ function QuoteRequestForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const category = searchParams.get('category') || '';
   const service = searchParams.get('service') || '';
@@ -27,10 +28,12 @@ function QuoteRequestForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setSubmitError(null);
 
     try {
       const response = await fetch('/api/quotes', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: formData.title,
@@ -51,8 +54,8 @@ function QuoteRequestForm() {
       router.push('/quotes?quoteRequested=true');
     } catch (error: unknown) {
       console.error('Error submitting quote request:', error);
-      alert(
-        `Failed to submit request: ${error instanceof Error ? error.message : 'Unknown error'}`
+      setSubmitError(
+        error instanceof Error ? error.message : 'Failed to submit quote request.'
       );
     } finally {
       setLoading(false);
@@ -88,6 +91,21 @@ function QuoteRequestForm() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
+          {submitError ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-medium">Quote request could not be submitted</p>
+              <p className="mt-1 text-amber-900/90">{submitError}</p>
+              {submitError.includes('Select a client context') ? (
+                <p className="mt-2">
+                  <Link href="/team" className="underline underline-offset-2 font-medium">
+                    Open team workspace
+                  </Link>{' '}
+                  and choose a client context, then submit again.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           {/* Project Title */}
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-gray-900 mb-2">
