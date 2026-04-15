@@ -12,6 +12,7 @@ import {
   Target,
   TrendingUp,
   Users,
+  CreditCard,
   BarChart3,
   Heart,
   Code,
