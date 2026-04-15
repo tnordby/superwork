@@ -146,7 +146,7 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
           gradient: 'from-green-500 to-emerald-600'
         },
         {
-          name: 'HubSpot CRM',
+          name: 'HubSpot CRM Migration',
           description: 'Structured CRM migration to HubSpot with phased discovery, test, and go-live',
           icon: RefreshCw,
           gradient: 'from-lime-400 to-green-500'

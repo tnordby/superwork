@@ -21,9 +21,17 @@ async function loadBrowseServiceTemplates(): Promise<ProjectsBrowseServiceRow[]>
       return [];
     }
 
+    const normalizeBrowseName = (name: string): string => {
+      const normalized = name.trim().toLowerCase();
+      if (normalized === 'crm migration' || normalized === 'hubspot crm') {
+        return 'HubSpot CRM Migration';
+      }
+      return name;
+    };
+
     const rows = (data ?? []).map((row) => ({
       id: row.id,
-      name: row.name,
+      name: normalizeBrowseName(row.name),
       category: row.category,
       customer_description: row.customer_description ?? null,
       estimated_hours: row.estimated_hours,
