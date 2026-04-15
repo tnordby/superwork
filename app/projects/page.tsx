@@ -29,25 +29,65 @@ async function loadBrowseServiceTemplates(): Promise<ProjectsBrowseServiceRow[]>
       return name;
     };
 
-    const rows = (data ?? []).map((row) => ({
-      id: row.id,
-      name: normalizeBrowseName(row.name),
-      category: row.category,
-      customer_description: row.customer_description ?? null,
-      estimated_hours: row.estimated_hours,
-      is_active: row.is_active,
-    }));
+    const hiddenBrowseServices = new Set([
+      'hubspot onboarding',
+      'hubspot service onboarding',
+      'predictive scoring',
+    ]);
+
+    const rows = (data ?? [])
+      .map((row) => ({
+        id: row.id,
+        name: normalizeBrowseName(row.name),
+        originalName: row.name,
+        category: row.category,
+        customer_description: row.customer_description ?? null,
+        estimated_hours: row.estimated_hours,
+        is_active: row.is_active,
+      }))
+      .filter((row) => !hiddenBrowseServices.has(row.name.trim().toLowerCase()));
 
     // Some migrations seed the same (category, name) templates more than once.
     // Dedupe here to keep the Browse UI clean without risking DB-level deletions
     // that could impact foreign keys (projects.service_template_id, service_sops, etc).
     const deduped: ProjectsBrowseServiceRow[] = [];
-    const seen = new Set<string>();
+    const seen = new Map<string, number>();
+    const getTemplatePriority = (originalName: string): number => {
+      const normalized = originalName.trim().toLowerCase();
+      if (normalized === 'hubspot crm') return 3;
+      if (normalized === 'hubspot crm migration') return 2;
+      if (normalized === 'crm migration') return 1;
+      return 0;
+    };
     for (const row of rows) {
       const key = `${row.category}::${row.name}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      deduped.push(row);
+      const existingIndex = seen.get(key);
+      if (existingIndex === undefined) {
+        seen.set(key, deduped.length);
+        deduped.push({
+          id: row.id,
+          name: row.name,
+          category: row.category,
+          customer_description: row.customer_description,
+          estimated_hours: row.estimated_hours,
+          is_active: row.is_active,
+        });
+        continue;
+      }
+
+      const existing = deduped[existingIndex];
+      const existingPriority = getTemplatePriority(existing.name);
+      const nextPriority = getTemplatePriority(row.originalName);
+      if (nextPriority > existingPriority) {
+        deduped[existingIndex] = {
+          id: row.id,
+          name: row.name,
+          category: row.category,
+          customer_description: row.customer_description,
+          estimated_hours: row.estimated_hours,
+          is_active: row.is_active,
+        };
+      }
     }
 
     return deduped;

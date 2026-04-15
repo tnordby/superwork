@@ -116,17 +116,20 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
     }
   };
 
+  const isHiddenBrowseServiceName = (serviceName: string): boolean => {
+    const normalized = serviceName.trim().toLowerCase();
+    return (
+      normalized === 'hubspot onboarding' ||
+      normalized === 'hubspot service onboarding' ||
+      normalized === 'predictive scoring'
+    );
+  };
+
   const projectCategories = [
     {
       title: 'HubSpot Services',
       color: 'bg-[#bfe937]',
       projects: [
-        {
-          name: 'HubSpot Service Onboarding',
-          description: 'Set up Service Hub foundations for tickets, SLAs, routing, and reporting',
-          icon: Rocket,
-          gradient: 'from-green-400 to-green-600'
-        },
         {
           name: 'HubSpot Commerce Onboarding',
           description: 'Launch Commerce Hub with products, quotes, subscriptions, and payments',
@@ -254,12 +257,6 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
           gradient: 'from-amber-400 to-orange-600'
         },
         {
-          name: 'Predictive scoring',
-          description: 'AI-driven scoring based on historical CRM performance',
-          icon: LineChart,
-          gradient: 'from-orange-400 to-red-600'
-        },
-        {
           name: 'AI agents',
           description: 'Deploy autonomous agents for research and follow-ups',
           icon: Bot,
@@ -277,6 +274,9 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
 
   // Group service templates by category
   const servicesByCategory = serviceTemplates.reduce((acc, service) => {
+    if (isHiddenBrowseServiceName(service.name)) {
+      return acc;
+    }
     if (!acc[service.category]) {
       acc[service.category] = [];
     }
