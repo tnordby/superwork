@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { Upload, FileText, Image as ImageIcon, File, Download, Trash2, Search, FolderOpen, Loader2 } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
+import { isInternalStaff } from '@/lib/auth/platform-role';
 import { Asset, Workspace, AssetCategory } from '@/types/assets';
 
 function AssetImagePreview({
@@ -71,6 +73,7 @@ function AssetImagePreview({
 }
 
 export default function AssetsPage() {
+  const { platformRole } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
@@ -85,6 +88,7 @@ export default function AssetsPage() {
   const [viewingClientName, setViewingClientName] = useState<string | null>(null);
   const [assetsLoadError, setAssetsLoadError] = useState<string | null>(null);
   const dragDepth = useRef(0);
+  const canSwitchWorkspace = platformRole !== null && isInternalStaff(platformRole);
 
   const loadWorkspaces = useCallback(async () => {
     try {
@@ -395,7 +399,7 @@ export default function AssetsPage() {
               >
                 Open team workspace
               </Link>{' '}
-              and choose a client (or pick a workspace above), then retry.
+              and choose a client, then retry.
             </p>
           ) : null}
           <button
@@ -409,7 +413,7 @@ export default function AssetsPage() {
       ) : null}
 
       {/* Workspace Selector */}
-      {workspaces.length > 0 && (
+      {canSwitchWorkspace && workspaces.length > 0 && (
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Workspace

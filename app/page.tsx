@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { DollarSign } from 'lucide-react';
+import { Banknote } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isAdmin, isConsultant, isQuoteManager } from '@/lib/auth/platform-role';
@@ -415,7 +415,7 @@ export default async function Home() {
         <section className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0e141d]">
-              <DollarSign className="h-5 w-5 text-white" />
+              <Banknote className="h-5 w-5 text-white" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900">Subscription</h2>
           </div>
