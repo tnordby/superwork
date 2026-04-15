@@ -17,6 +17,13 @@ interface ServiceTemplate {
   estimated_hours: number | null;
 }
 
+function isMarketingOnboardingService(serviceName: string | null | undefined): boolean {
+  return (
+    serviceName === 'HubSpot Marketing Onboarding' ||
+    serviceName === 'HubSpot Marketing Hub Onboarding'
+  );
+}
+
 function CreateProjectForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -290,8 +297,8 @@ function CreateProjectForm() {
         payload.team_id = teamIdForProject.trim();
       }
 
-      // For HubSpot Marketing Hub, format the description with form data
-      if (serviceTemplate?.name === 'HubSpot Marketing Hub Onboarding') {
+      // For HubSpot Marketing Onboarding, format the description with form data
+      if (isMarketingOnboardingService(serviceTemplate?.name)) {
         payload.description = formatMarketingHubDescription(formData.description, marketingFormData);
       }
 
@@ -383,9 +390,9 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
     'AI & Data Services',
   ];
 
-  // Auto-set form data when service template loads
+  // Auto-set form data when marketing onboarding template loads
   useEffect(() => {
-    if (serviceTemplate && serviceTemplate.name === 'HubSpot Marketing Hub Onboarding') {
+    if (serviceTemplate && isMarketingOnboardingService(serviceTemplate.name)) {
       setFormData(prev => ({
         ...prev,
         name: serviceTemplate.name,
@@ -395,7 +402,7 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
     }
   }, [serviceTemplate]);
 
-  // Service-specific form for HubSpot Marketing Hub Onboarding
+  // Service-specific form for HubSpot Marketing Onboarding
   const renderMarketingHubForm = () => {
     return (
       <div className="space-y-6">
@@ -584,7 +591,7 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
           console.log('🔍 serviceTemplate name:', serviceTemplate?.name);
           console.log('🔍 Has intake form:', hasIntakeForm);
 
-          const isMarketingHub = serviceTemplate?.name === 'HubSpot Marketing Hub Onboarding';
+          const isMarketingHub = isMarketingOnboardingService(serviceTemplate?.name);
           console.log('🔍 Is Marketing Hub:', isMarketingHub);
 
           // Use dynamic intake form if available (and not Marketing Hub which has custom form)

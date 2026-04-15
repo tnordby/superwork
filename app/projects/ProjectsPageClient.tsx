@@ -121,10 +121,22 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
       color: 'bg-[#bfe937]',
       projects: [
         {
-          name: 'HubSpot onboarding',
-          description: 'Fast, structured onboarding tailored to your business',
+          name: 'HubSpot Service Onboarding',
+          description: 'Set up Service Hub foundations for tickets, SLAs, routing, and reporting',
           icon: Rocket,
           gradient: 'from-green-400 to-green-600'
+        },
+        {
+          name: 'HubSpot Commerce Onboarding',
+          description: 'Launch Commerce Hub with products, quotes, subscriptions, and payments',
+          icon: CreditCard,
+          gradient: 'from-emerald-400 to-teal-600'
+        },
+        {
+          name: 'HubSpot Content Onboarding',
+          description: 'Configure Content Hub for structured publishing and performance tracking',
+          icon: FileText,
+          gradient: 'from-lime-400 to-green-500'
         },
         {
           name: 'CRM implementation',
@@ -149,6 +161,12 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
           description: 'Define your lead stages, scoring, and handover processes',
           icon: Target,
           gradient: 'from-emerald-400 to-green-600'
+        },
+        {
+          name: 'HubSpot Data Onboarding',
+          description: 'Configure data collections, models, and ingestion',
+          icon: Database,
+          gradient: 'from-yellow-400 to-orange-600'
         },
       ],
     },
@@ -228,12 +246,6 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
       title: 'AI & Data Services',
       color: 'bg-[#e8f4a0]',
       projects: [
-        {
-          name: 'HubSpot Data Hub setup',
-          description: 'Configure data collections, models, and ingestion',
-          icon: Database,
-          gradient: 'from-yellow-400 to-orange-600'
-        },
         {
           name: 'Data enrichment',
           description: 'Automate enrichment using APIs and AI',
