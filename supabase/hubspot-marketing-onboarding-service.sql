@@ -23,7 +23,7 @@ BEGIN
     is_active
   )
   VALUES (
-    'HubSpot Marketing Hub Onboarding',
+    'HubSpot Marketing Onboarding',
     'HubSpot Services',
     E'This project covers the setup and configuration of **HubSpot Marketing Hub** to establish a solid marketing foundation.\n\nWe will configure core marketing infrastructure including data privacy and consent settings, domains and redirects, forms and calls-to-action, email templates and subscription preferences, landing page templates, marketing workflows, automation, and reporting.\n\nAll work is delivered using a standardized implementation process. You can follow progress in real time through tasks and milestones in this portal.\n\nProgress is tracked automatically based on completed tasks, and you will be notified as the project moves through each phase.',
     80,
@@ -126,7 +126,7 @@ SELECT
 FROM service_templates st
 JOIN service_sops ss ON ss.service_template_id = st.id
 LEFT JOIN sop_tasks sopt ON sopt.sop_id = ss.id
-WHERE st.name = 'HubSpot Marketing Hub Onboarding'
+WHERE st.name = 'HubSpot Marketing Onboarding'
 GROUP BY st.id, st.name, st.category, st.estimated_hours, ss.id, ss.title, ss.order_index
 ORDER BY ss.order_index;
 
@@ -142,13 +142,13 @@ SELECT
 FROM service_templates st
 JOIN service_sops ss ON ss.service_template_id = st.id
 JOIN sop_tasks sopt ON sopt.sop_id = ss.id
-WHERE st.name = 'HubSpot Marketing Hub Onboarding'
+WHERE st.name = 'HubSpot Marketing Onboarding'
 ORDER BY ss.order_index, sopt.order_index;
 
 -- =============================================
 -- SUCCESS!
 -- =============================================
--- HubSpot Marketing Hub Onboarding service created with:
+-- HubSpot Marketing Onboarding service created with:
 -- ✓ Service template with customer-facing description
 -- ✓ 3 internal SOPs (milestones)
 -- ✓ 23 customer-visible tasks

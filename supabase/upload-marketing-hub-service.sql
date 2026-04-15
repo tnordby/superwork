@@ -1,12 +1,12 @@
 -- =============================================
--- UPLOAD HUBSPOT MARKETING HUB ONBOARDING SERVICE
+-- UPLOAD HUBSPOT MARKETING ONBOARDING SERVICE
 -- =============================================
 -- This script removes any existing version and uploads the v2 service
 -- =============================================
 
--- Step 1: Remove any existing HubSpot Marketing Hub Onboarding services
+-- Step 1: Remove any existing marketing onboarding services (new + legacy names)
 DELETE FROM service_templates
-WHERE name = 'HubSpot Marketing Hub Onboarding';
+WHERE name IN ('HubSpot Marketing Onboarding', 'HubSpot Marketing Hub Onboarding');
 
 -- Step 2: Create the v2 service with 7 focused milestones
 DO $$
@@ -31,7 +31,7 @@ BEGIN
     is_active
   )
   VALUES (
-    'HubSpot Marketing Hub Onboarding',
+    'HubSpot Marketing Onboarding',
     'HubSpot Services',
     E'This project covers the setup and configuration of **HubSpot Marketing Hub** to establish a solid marketing foundation.\n\nWe will configure core marketing infrastructure including data privacy and consent settings, domains and redirects, forms and calls-to-action, email templates and subscription preferences, landing page templates, marketing workflows, automation, and reporting.\n\nAll work is delivered using a standardized implementation process. You can follow progress in real time through tasks and milestones in this portal.\n\nProgress is tracked automatically based on completed tasks, and you will be notified as the project moves through each phase.',
     80,
@@ -202,7 +202,7 @@ SELECT
 FROM service_templates st
 JOIN service_sops ss ON ss.service_template_id = st.id
 LEFT JOIN sop_tasks sopt ON sopt.sop_id = ss.id
-WHERE st.name = 'HubSpot Marketing Hub Onboarding'
+WHERE st.name = 'HubSpot Marketing Onboarding'
 GROUP BY st.id, st.name, st.category, st.estimated_hours, ss.id, ss.title, ss.order_index
 ORDER BY ss.order_index;
 
@@ -210,7 +210,7 @@ ORDER BY ss.order_index;
 -- SUCCESS MESSAGE
 -- =============================================
 SELECT
-  'SUCCESS! HubSpot Marketing Hub Onboarding service uploaded with:' as message
+  'SUCCESS! HubSpot Marketing Onboarding service uploaded with:' as message
 UNION ALL
 SELECT '✓ 7 focused milestones'
 UNION ALL

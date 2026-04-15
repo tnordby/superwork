@@ -1,7 +1,8 @@
 -- =============================================
--- REMOVE DUPLICATE HUBSPOT MARKETING HUB ONBOARDING
+-- REMOVE DUPLICATE HUBSPOT MARKETING ONBOARDING
 -- =============================================
--- This script will keep the most recent one and delete the older duplicate
+-- This script will keep the most recent one and delete older duplicates.
+-- Supports both the new and legacy service names.
 -- =============================================
 
 -- First, let's see what we have
@@ -11,7 +12,7 @@ SELECT
   created_at,
   estimated_hours
 FROM service_templates
-WHERE name = 'HubSpot Marketing Hub Onboarding'
+WHERE name IN ('HubSpot Marketing Onboarding', 'HubSpot Marketing Hub Onboarding')
 ORDER BY created_at DESC;
 
 -- Delete the older duplicate (keeps the most recent one)
@@ -20,7 +21,7 @@ DELETE FROM service_templates
 WHERE id IN (
   SELECT id
   FROM service_templates
-  WHERE name = 'HubSpot Marketing Hub Onboarding'
+  WHERE name IN ('HubSpot Marketing Onboarding', 'HubSpot Marketing Hub Onboarding')
   ORDER BY created_at ASC
   LIMIT 1
 );
@@ -32,7 +33,7 @@ SELECT
   created_at,
   estimated_hours
 FROM service_templates
-WHERE name = 'HubSpot Marketing Hub Onboarding';
+WHERE name IN ('HubSpot Marketing Onboarding', 'HubSpot Marketing Hub Onboarding');
 
 -- =============================================
 -- SUCCESS!
