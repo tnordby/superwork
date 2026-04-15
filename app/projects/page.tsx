@@ -33,6 +33,8 @@ async function loadBrowseServiceTemplates(): Promise<ProjectsBrowseServiceRow[]>
       'hubspot onboarding',
       'hubspot service onboarding',
       'predictive scoring',
+      'lifecycle management',
+      'hubspot data hub setup',
     ]);
 
     const rows = (data ?? [])

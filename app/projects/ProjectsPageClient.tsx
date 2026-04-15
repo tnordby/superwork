@@ -121,7 +121,9 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
     return (
       normalized === 'hubspot onboarding' ||
       normalized === 'hubspot service onboarding' ||
-      normalized === 'predictive scoring'
+      normalized === 'predictive scoring' ||
+      normalized === 'lifecycle management' ||
+      normalized === 'hubspot data hub setup'
     );
   };
 
@@ -159,12 +161,6 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
           description: 'Improve data accuracy with workflows and automation',
           icon: Sparkles,
           gradient: 'from-green-400 to-teal-500'
-        },
-        {
-          name: 'Lifecycle management',
-          description: 'Define your lead stages, scoring, and handover processes',
-          icon: Target,
-          gradient: 'from-emerald-400 to-green-600'
         },
         {
           name: 'HubSpot Data Onboarding',
