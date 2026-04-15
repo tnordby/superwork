@@ -284,7 +284,40 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
     return acc;
   }, {} as Record<string, ProjectsBrowseServiceRow[]>);
 
-  const categories = Object.keys(servicesByCategory);
+  // Merge DB catalog with static fallback so partially-seeded environments
+  // still show expected services in Browse.
+  const mergedServicesByCategory = Object.entries(servicesByCategory).reduce(
+    (acc, [category, services]) => {
+      acc[category] = [...services];
+      return acc;
+    },
+    {} as Record<string, ProjectsBrowseServiceRow[]>
+  );
+
+  projectCategories.forEach((category) => {
+    if (!mergedServicesByCategory[category.title]) {
+      mergedServicesByCategory[category.title] = [];
+    }
+
+    category.projects.forEach((project) => {
+      const existsInCategory = mergedServicesByCategory[category.title].some(
+        (service) => service.name.toLowerCase() === project.name.toLowerCase()
+      );
+
+      if (!existsInCategory) {
+        mergedServicesByCategory[category.title].push({
+          id: `static-${category.title}-${project.name}`,
+          name: project.name,
+          category: category.title,
+          customer_description: project.description,
+          estimated_hours: null,
+          is_active: true,
+        });
+      }
+    });
+  });
+
+  const categories = Object.keys(mergedServicesByCategory);
 
   const filteredCategories = selectedCategory
     ? projectCategories.filter((cat) => cat.title === selectedCategory)
@@ -525,13 +558,20 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
                       <h2 className="text-xl font-semibold text-gray-900 mb-6">{category}</h2>
                       {/* Service Cards Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {servicesByCategory[category].map((service) => {
+                        {mergedServicesByCategory[category].map((service) => {
                           const visuals = getServiceVisuals(service.name);
                           const Icon = visuals.icon;
+                          const isStaticFallback = service.id.startsWith('static-');
                           return (
                             <button
                               key={service.id}
-                              onClick={() => handleServiceClick(category, service.name, service.id)}
+                              onClick={() =>
+                                handleServiceClick(
+                                  category,
+                                  service.name,
+                                  isStaticFallback ? undefined : service.id
+                                )
+                              }
                               className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white text-left transition-all hover:border-gray-300 hover:shadow-lg"
                             >
                               {/* Featured Image */}
