@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe, STRIPE_CONFIG } from '@/lib/stripe/config';
+import {
+  stripeTestSecretInProductionPortalErrorBody,
+  stripeTestSecretKeyInProductionDeploy,
+} from '@/lib/stripe/stripe-secret-production-mismatch';
 import { createClient } from '@/lib/supabase/server';
 
 function billingPortalReturnUrl(): string {
@@ -72,6 +76,10 @@ export async function POST(request: NextRequest) {
         { error: 'No billing account found. Please subscribe to a plan first.' },
         { status: 400 }
       );
+    }
+
+    if (stripeTestSecretKeyInProductionDeploy()) {
+      return NextResponse.json(stripeTestSecretInProductionPortalErrorBody(), { status: 503 });
     }
 
     // Create billing portal session (requires Customer Portal enabled in Stripe + return URL allowlisted)

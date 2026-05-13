@@ -277,6 +277,20 @@ stripe trigger invoice.payment_failed
 
 ## Troubleshooting
 
+### `STRIPE_SUPERWORK_CAPACITY_PRODUCT_ID` missing (503 from checkout or plan change)
+
+**Symptom:** API returns a 503 with a message about `STRIPE_SUPERWORK_CAPACITY_PRODUCT_ID` (and may include `code: MISSING_STRIPE_SUPERWORK_CAPACITY_PRODUCT_ID`).
+
+**Fix:** In your hosting env (e.g. Vercel → Project → Settings → Environment Variables) or `.env.local`, set `STRIPE_SUPERWORK_CAPACITY_PRODUCT_ID` to the Product ID from **Stripe Dashboard → Products** (`prod_…`). Toggle **View test data** so it matches your keys: test `prod_…` only with `sk_test_`, live `prod_…` only with `sk_live_`. Redeploy after changing env vars.
+
+### “Manage billing” opens test / sandbox Customer Portal in production
+
+**Symptom:** Users on the real app land in Stripe’s **test** portal or see test-mode data.
+
+**Cause:** `STRIPE_SECRET_KEY` is still `sk_test_…` on a **production** deploy (e.g. Vercel **Production**). Stripe does not have a separate “sandbox flag” in Superwork — the secret key **is** the mode.
+
+**Fix:** On the production environment only, set `STRIPE_SECRET_KEY=sk_live_…`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_…`, `STRIPE_WEBHOOK_SECRET` from a **live** webhook endpoint (not the Stripe CLI test forwarding secret unless you only receive test events), and `STRIPE_SUPERWORK_CAPACITY_PRODUCT_ID` from **live** Products. Align stored `stripe_customer_id` / subscription IDs with live mode (see [Database vs Stripe mode](#4-database-vs-stripe-mode-important)). If the API returns `code: STRIPE_TEST_SECRET_KEY_IN_PRODUCTION`, the server blocked the portal session on purpose until live keys are configured.
+
 ### Webhook not receiving events
 
 1. Check webhook endpoint is publicly accessible

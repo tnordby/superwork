@@ -12,6 +12,10 @@ import {
   stripeRecurringForCapacityPeriod,
   type CapacityBillingPeriod,
 } from '@/lib/billing/capacity-pricing';
+import {
+  missingCapacityProductIdMessage,
+  stripeCapacityProductIdOrNull,
+} from '@/lib/stripe/capacity-product-env';
 
 type CapacityCheckoutBody = {
   monthlyBudgetEur: number;
@@ -104,10 +108,10 @@ export async function POST(request: NextRequest) {
     };
 
     if (body.capacityCheckout) {
-      const productId = process.env.STRIPE_SUPERWORK_CAPACITY_PRODUCT_ID;
+      const productId = stripeCapacityProductIdOrNull();
       if (!productId) {
         return NextResponse.json(
-          { error: 'Server is missing STRIPE_SUPERWORK_CAPACITY_PRODUCT_ID' },
+          { error: missingCapacityProductIdMessage(), code: 'MISSING_STRIPE_SUPERWORK_CAPACITY_PRODUCT_ID' },
           { status: 503 }
         );
       }
