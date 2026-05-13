@@ -291,6 +291,14 @@ stripe trigger invoice.payment_failed
 
 **Fix:** On the production environment only, set `STRIPE_SECRET_KEY=sk_live_…`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_…`, `STRIPE_WEBHOOK_SECRET` from a **live** webhook endpoint (not the Stripe CLI test forwarding secret unless you only receive test events), and `STRIPE_SUPERWORK_CAPACITY_PRODUCT_ID` from **live** Products. Align stored `stripe_customer_id` / subscription IDs with live mode (see [Database vs Stripe mode](#4-database-vs-stripe-mode-important)). If the API returns `code: STRIPE_TEST_SECRET_KEY_IN_PRODUCTION`, the server blocked the portal session on purpose until live keys are configured.
 
+### Portal 502: customer ID not valid (`STRIPE_CUSTOMER_MODE_MISMATCH`)
+
+**Symptom:** `POST /api/stripe/create-portal-session` returns **502** with `code: STRIPE_CUSTOMER_MODE_MISMATCH` (or Stripe’s message mentions “similar object exists in test/live mode”).
+
+**Cause:** The workspace’s `stripe_customer_id` was created in **Test** mode but production now uses **live** API keys (common right after going live), or the customer was deleted / belongs to another Stripe account.
+
+**Fix:** In Stripe Dashboard, switch to **Live** mode and find (or create) the correct customer for that workspace. Either complete **live** Checkout again so webhooks write fresh live IDs, or update `workspaces.stripe_customer_id` (and related subscription fields) in a controlled migration. Never point live keys at a test-mode `cus_…`.
+
 ### Webhook not receiving events
 
 1. Check webhook endpoint is publicly accessible

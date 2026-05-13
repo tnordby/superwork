@@ -472,7 +472,7 @@ export default function PlanPage() {
                 <h2 className="text-xl font-semibold text-gray-900">Budget overview</h2>
                 <div className="mt-4 min-h-0 flex-1 space-y-3 text-sm">
                   <div className="flex justify-between border-b border-gray-100 py-2">
-                    <span className="text-gray-600">Purchased balance (anchor)</span>
+                    <span className="text-gray-600">Purchased balance</span>
                     <span className="font-medium text-gray-900">{formatAmount(startingBalance, currency)}</span>
                   </div>
                   <div className="flex justify-between border-b border-gray-100 py-2">
@@ -592,7 +592,7 @@ export default function PlanPage() {
                 <h2 className="text-xl font-semibold text-gray-900">Budget overview</h2>
                 <div className="mt-4 min-h-0 flex-1 space-y-3 text-sm">
                   <div className="flex justify-between border-b border-gray-100 py-2">
-                    <span className="text-gray-600">Purchased balance (anchor)</span>
+                    <span className="text-gray-600">Purchased balance</span>
                     <span className="font-medium text-gray-900">{formatAmount(startingBalance, currency)}</span>
                   </div>
                   <div className="flex justify-between border-b border-gray-100 py-2">

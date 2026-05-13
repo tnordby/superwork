@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe, STRIPE_CONFIG } from '@/lib/stripe/config';
+import { portalCustomerModeMismatchResponse } from '@/lib/stripe/stripe-customer-mode-mismatch';
 import {
   stripeTestSecretInProductionPortalErrorBody,
   stripeTestSecretKeyInProductionDeploy,
@@ -118,13 +119,7 @@ export async function POST(request: NextRequest) {
         msg.includes('similar object exists in test mode') ||
         msg.includes('similar object exists in live mode')
       ) {
-        return NextResponse.json(
-          {
-            error:
-              'This workspace’s Stripe customer ID does not exist in the Stripe mode your server is using. Use live keys with live customers (or test with test keys) and matching STRIPE_SECRET_KEY.',
-          },
-          { status: 502 }
-        );
+        return NextResponse.json(portalCustomerModeMismatchResponse(error.message || ''), { status: 502 });
       }
 
       if (msg.includes('return_url') || msg.includes('return url')) {
