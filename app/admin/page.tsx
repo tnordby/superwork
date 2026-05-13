@@ -31,6 +31,33 @@ export default function AdminPage() {
       </Link>
 
       <Link
+        href="/admin/billing"
+        className="block p-6 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-emerald-400 hover:shadow-md transition-all"
+      >
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-emerald-100 rounded-lg">
+            <svg
+              className="w-6 h-6 text-emerald-800"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Workspace pricing</h2>
+            <p className="text-sm text-gray-600">Slider vs legacy tiers and sales flags</p>
+          </div>
+        </div>
+      </Link>
+
+      <Link
         href="/admin/users"
         className="block p-6 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-amber-400 hover:shadow-md transition-all"
       >

@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import {
+  isBlockedSignupEmailDomain,
+  SIGNUP_WORK_EMAIL_REQUIRED_MESSAGE,
+} from '@/lib/auth/blocked-signup-email-domains';
 import { Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function SignupPage() {
@@ -12,6 +16,7 @@ export default function SignupPage() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [honeypot, setHoneypot] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,6 +28,17 @@ export default function SignupPage() {
     setError('');
     setSuccess(false);
     setLoading(true);
+
+    if (honeypot.trim() !== '') {
+      setLoading(false);
+      return;
+    }
+
+    if (isBlockedSignupEmailDomain(email)) {
+      setError(SIGNUP_WORK_EMAIL_REQUIRED_MESSAGE);
+      setLoading(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -49,6 +65,7 @@ export default function SignupPage() {
         fetch('/api/emails/welcome', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ email, firstName }),
         }).catch(error => {
           console.error('Failed to send welcome email:', error);
@@ -137,10 +154,23 @@ export default function SignupPage() {
               </div>
             </div>
 
+            <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
+              <label htmlFor="website">Website</label>
+              <input
+                id="website"
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
+              />
+            </div>
+
             {/* Email */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
-                Email
+                Work email
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -151,9 +181,12 @@ export default function SignupPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                  placeholder="you@example.com"
+                  placeholder="you@yourcompany.com"
                 />
               </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Use your company email. Personal addresses (Gmail, Outlook, iCloud, etc.) cannot be used to sign up.
+              </p>
             </div>
 
             {/* Password */}

@@ -20,7 +20,7 @@ function BillingSuccessContent() {
 
   useEffect(() => {
     if (!sessionId) {
-      router.push('/billing');
+      router.push('/plan');
       return;
     }
 
@@ -29,7 +29,7 @@ function BillingSuccessContent() {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          router.push('/billing');
+          router.push('/plan');
           return 0;
         }
         return prev - 1;
@@ -57,10 +57,10 @@ function BillingSuccessContent() {
 
           <div className="space-y-4">
             <button
-              onClick={() => router.push('/billing')}
+              onClick={() => router.push('/plan')}
               className="w-full rounded-xl bg-[#bfe937] px-6 py-3 text-sm font-medium text-gray-900 transition-colors hover:bg-[#acd829]"
             >
-              View Billing Dashboard
+              View plan & billing
             </button>
 
             <button
@@ -72,7 +72,7 @@ function BillingSuccessContent() {
           </div>
 
           <p className="text-sm text-gray-500 mt-6">
-            Redirecting to billing dashboard in {countdown} seconds...
+            Redirecting to your plan in {countdown} seconds...
           </p>
         </div>
       </div>

@@ -19,6 +19,13 @@ export type CustomerWorkspaceContext =
     }
   | { error: string; status: 404 | 500 | 503 };
 
+/** Owner or workspace admin/owner role may start checkout and change subscription capacity. */
+export function customerCanManageBilling(
+  ctx: Extract<CustomerWorkspaceContext, { workspace: CustomerWorkspaceRow }>
+): boolean {
+  return ctx.isOwner || ctx.actorRole === 'admin' || ctx.actorRole === 'owner';
+}
+
 /**
  * Resolves the authenticated customer's primary client workspace (owned or first membership).
  * Used by account APIs (members, teams, etc.).

@@ -34,4 +34,9 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# superwork
+
+## superwork
+
+- Copy `.env.example` to `.env.local`. Remove legacy `ONBOARDING_*` variables from Vercel/hosting if they are still set.
+- Apply Supabase migrations under `supabase/migrations/` (including `050` and `051`) before production intake features.
+- If Next.js reports missing modules after removing API routes, run `npm run clean` then `npm run dev` or `npm run build`.

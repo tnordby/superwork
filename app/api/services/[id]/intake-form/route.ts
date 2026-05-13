@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { logIntakeRouteError } from '@/lib/observability/intake-server-log'
+import { isUuidString } from '@/lib/validation/is-uuid'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
@@ -9,40 +11,37 @@ export async function GET(
     const supabase = await createClient()
     const params = await context.params
 
-    // Fetch intake form fields
-    console.log('Fetching intake form fields for service:', params.id)
+    if (!isUuidString(params.id)) {
+      return NextResponse.json({ error: 'Invalid service id' }, { status: 400 })
+    }
+
     const { data: fields, error: fieldsError } = await supabase
       .from('intake_form_fields')
       .select('*')
       .eq('service_template_id', params.id)
       .order('order_index')
 
-    console.log('Fields result:', { fields, error: fieldsError })
-
     if (fieldsError) {
-      console.error('Error fetching intake form fields:', fieldsError)
-      console.error('Error details:', JSON.stringify(fieldsError, null, 2))
-      return NextResponse.json(
-        { error: 'Failed to fetch intake form fields', details: fieldsError },
-        { status: 500 }
-      )
+      logIntakeRouteError('intake-form', 'fields_query', fieldsError, {
+        serviceTemplateId: params.id,
+      })
+      return NextResponse.json({ error: 'Failed to fetch intake form fields' }, { status: 500 })
     }
 
-    // Fetch conditional logic
     const { data: conditions, error: conditionsError } = await supabase
       .from('intake_form_conditions')
       .select('*')
       .eq('service_template_id', params.id)
+      .order('order_index', { ascending: true })
+      .order('id', { ascending: true })
 
     if (conditionsError) {
-      console.error('Error fetching conditions:', conditionsError)
-      return NextResponse.json(
-        { error: 'Failed to fetch conditional logic' },
-        { status: 500 }
-      )
+      logIntakeRouteError('intake-form', 'conditions_query', conditionsError, {
+        serviceTemplateId: params.id,
+      })
+      return NextResponse.json({ error: 'Failed to fetch conditional logic' }, { status: 500 })
     }
 
-    // Fetch service template info
     const { data: service, error: serviceError } = await supabase
       .from('service_templates')
       .select('name, category')
@@ -50,11 +49,10 @@ export async function GET(
       .single()
 
     if (serviceError) {
-      console.error('Error fetching service:', serviceError)
-      return NextResponse.json(
-        { error: 'Service not found' },
-        { status: 404 }
-      )
+      logIntakeRouteError('intake-form', 'service_lookup', serviceError, {
+        serviceTemplateId: params.id,
+      })
+      return NextResponse.json({ error: 'Service not found' }, { status: 404 })
     }
 
     return NextResponse.json({
@@ -63,10 +61,7 @@ export async function GET(
       conditions: conditions || [],
     })
   } catch (error) {
-    console.error('Error in intake form API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logIntakeRouteError('intake-form', 'unexpected', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

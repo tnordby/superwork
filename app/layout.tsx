@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
@@ -25,6 +26,13 @@ export default function RootLayout({
         <AuthProvider>
           <ConditionalLayout>{children}</ConditionalLayout>
         </AuthProvider>
+        {/* Start of HubSpot Embed Code */}
+        <Script
+          id="hs-script-loader"
+          strategy="lazyOnload"
+          src="https://js.hs-scripts.com/506440.js"
+        />
+        {/* End of HubSpot Embed Code */}
       </body>
     </html>
   );

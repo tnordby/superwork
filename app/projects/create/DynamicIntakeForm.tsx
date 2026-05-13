@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Loader2 } from 'lucide-react'
+import { computeVisibleIntakeFieldNames } from '@/lib/intake/compute-visible-intake-fields'
+import {
+  pickVisibleIntakeResponses,
+  validateIntakeResponses,
+} from '@/lib/intake/validate-intake-responses'
 
 /** Single value for a dynamic intake field (JSON-serializable). */
 export type IntakeResponseValue = string | number | boolean | string[] | undefined
@@ -46,6 +51,7 @@ export default function DynamicIntakeForm({
   const [conditions, setConditions] = useState<IntakeFormCondition[]>([])
   const [responses, setResponses] = useState<IntakeResponseMap>({})
   const [formLoading, setFormLoading] = useState(true)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   // Fetch intake form configuration
   useEffect(() => {
@@ -80,28 +86,18 @@ export default function DynamicIntakeForm({
   }, [serviceTemplateId])
 
   const visibleFieldNames = useMemo(() => {
-    const next = new Set(fields.map((f) => f.field_name))
-    conditions.forEach((condition) => {
-      const triggerValue = responses[condition.trigger_field_name]
-
-      if (triggerValue === condition.trigger_value) {
-        if (condition.action === 'show') {
-          condition.target_field_names.forEach((name) => next.add(name))
-        } else if (condition.action === 'hide') {
-          condition.target_field_names.forEach((name) => next.delete(name))
-        }
-      } else {
-        if (condition.action === 'show') {
-          condition.target_field_names.forEach((name) => next.delete(name))
-        } else if (condition.action === 'hide') {
-          condition.target_field_names.forEach((name) => next.add(name))
-        }
-      }
-    })
-    return next
+    const fieldNames = fields.map((f) => f.field_name)
+    const visibilityConditions = conditions.map((c) => ({
+      trigger_field_name: c.trigger_field_name,
+      trigger_value: c.trigger_value,
+      action: c.action,
+      target_field_names: c.target_field_names,
+    }))
+    return computeVisibleIntakeFieldNames(fieldNames, visibilityConditions, responses)
   }, [fields, conditions, responses])
 
   const handleFieldChange = (fieldName: string, value: IntakeResponseValue) => {
+    setSubmitError(null)
     setResponses((prev) => ({
       ...prev,
       [fieldName]: value,
@@ -110,7 +106,13 @@ export default function DynamicIntakeForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit(responses)
+    const validationError = validateIntakeResponses(fields, responses, visibleFieldNames)
+    if (validationError) {
+      setSubmitError(validationError)
+      return
+    }
+    setSubmitError(null)
+    onSubmit(pickVisibleIntakeResponses(responses, visibleFieldNames))
   }
 
   const renderField = (field: IntakeFormField) => {
@@ -118,6 +120,7 @@ export default function DynamicIntakeForm({
       return null
     }
 
+    const effectiveRequired = field.is_required && visibleFieldNames.has(field.field_name)
     const value = responses[field.field_name]
     const textLikeValue =
       value === undefined || value === null ? '' : typeof value === 'string' ? value : String(value)
@@ -134,13 +137,13 @@ export default function DynamicIntakeForm({
         return (
           <div key={field.id}>
             <label className="block text-sm font-medium text-gray-900 mb-2">
-              {field.label} {field.is_required && <span className="text-red-500">*</span>}
+              {field.label} {effectiveRequired && <span className="text-red-500">*</span>}
             </label>
             <input
               type={field.field_type}
               value={textLikeValue}
               onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-              required={field.is_required}
+              required={effectiveRequired}
               placeholder={field.placeholder}
               className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
             />
@@ -154,13 +157,13 @@ export default function DynamicIntakeForm({
         return (
           <div key={field.id}>
             <label className="block text-sm font-medium text-gray-900 mb-2">
-              {field.label} {field.is_required && <span className="text-red-500">*</span>}
+              {field.label} {effectiveRequired && <span className="text-red-500">*</span>}
             </label>
             <input
               type="number"
               value={textLikeValue}
               onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-              required={field.is_required}
+              required={effectiveRequired}
               placeholder={field.placeholder}
               min={validationMin}
               max={validationMax}
@@ -176,12 +179,12 @@ export default function DynamicIntakeForm({
         return (
           <div key={field.id}>
             <label className="block text-sm font-medium text-gray-900 mb-2">
-              {field.label} {field.is_required && <span className="text-red-500">*</span>}
+              {field.label} {effectiveRequired && <span className="text-red-500">*</span>}
             </label>
             <textarea
               value={textLikeValue}
               onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-              required={field.is_required}
+              required={effectiveRequired}
               placeholder={field.placeholder}
               rows={4}
               className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
@@ -196,12 +199,12 @@ export default function DynamicIntakeForm({
         return (
           <div key={field.id}>
             <label className="block text-sm font-medium text-gray-900 mb-2">
-              {field.label} {field.is_required && <span className="text-red-500">*</span>}
+              {field.label} {effectiveRequired && <span className="text-red-500">*</span>}
             </label>
             <select
               value={textLikeValue}
               onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-              required={field.is_required}
+              required={effectiveRequired}
               className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
             >
               <option value="">Select an option</option>
@@ -221,7 +224,7 @@ export default function DynamicIntakeForm({
         return (
           <div key={field.id}>
             <label className="block text-sm font-medium text-gray-900 mb-2">
-              {field.label} {field.is_required && <span className="text-red-500">*</span>}
+              {field.label} {effectiveRequired && <span className="text-red-500">*</span>}
             </label>
             <div className="space-y-2">
               {field.options?.map((option) => (
@@ -232,7 +235,7 @@ export default function DynamicIntakeForm({
                     value={option}
                     checked={textLikeValue === option}
                     onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-                    required={field.is_required}
+                    required={effectiveRequired}
                     className="w-4 h-4 text-gray-900 focus:ring-gray-900"
                   />
                   <span className="text-sm text-gray-700">{option}</span>
@@ -253,11 +256,11 @@ export default function DynamicIntakeForm({
                 type="checkbox"
                 checked={value === true || value === 'true'}
                 onChange={(e) => handleFieldChange(field.field_name, e.target.checked)}
-                required={field.is_required}
+                required={effectiveRequired}
                 className="w-4 h-4 text-gray-900 rounded focus:ring-gray-900"
               />
               <span className="text-sm font-medium text-gray-900">
-                {field.label} {field.is_required && <span className="text-red-500">*</span>}
+                {field.label} {effectiveRequired && <span className="text-red-500">*</span>}
               </span>
             </label>
             {field.help_text && (
@@ -270,7 +273,7 @@ export default function DynamicIntakeForm({
         return (
           <div key={field.id}>
             <label className="block text-sm font-medium text-gray-900 mb-2">
-              {field.label} {field.is_required && <span className="text-red-500">*</span>}
+              {field.label} {effectiveRequired && <span className="text-red-500">*</span>}
             </label>
             <div className="space-y-2">
               {field.options?.map((option) => (
@@ -324,6 +327,11 @@ export default function DynamicIntakeForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {submitError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {submitError}
+        </div>
+      )}
       {fields.map((field) => renderField(field))}
 
       <div className="flex items-center justify-end gap-4 pt-6 border-t border-gray-200">

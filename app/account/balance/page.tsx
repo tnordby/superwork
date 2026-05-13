@@ -168,7 +168,7 @@ export default function BalancePage() {
               <div className="text-sm text-gray-500">Available balance</div>
             </div>
             <button
-              onClick={() => router.push('/account/plan')}
+              onClick={() => router.push('/plan')}
               className="flex items-center gap-2 rounded-xl bg-[#bfe937] px-5 py-3 text-sm font-semibold text-gray-900 shadow-sm transition-colors hover:bg-[#acd829]"
             >
               <PlusCircle className="h-4 w-4" />
@@ -182,7 +182,7 @@ export default function BalancePage() {
         <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
           No active billing plan. Add a plan to fund project work.
           <button
-            onClick={() => router.push('/account/plan')}
+            onClick={() => router.push('/plan')}
             className="ml-2 font-semibold text-gray-900 underline"
           >
             Go to billing
@@ -205,7 +205,7 @@ export default function BalancePage() {
 
           {/* Add funds */}
           <button
-            onClick={() => router.push('/account/plan')}
+            onClick={() => router.push('/plan')}
             className="w-full rounded-xl border border-[#bfe937] bg-[#f7fce8] p-6 text-left transition-colors hover:bg-[#eff8d1]"
           >
             <div className="flex items-center justify-between mb-2">

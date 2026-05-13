@@ -6,7 +6,6 @@ import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isAdmin, isConsultant, isQuoteManager } from '@/lib/auth/platform-role';
 import { sumCommittedBalanceCents, sumUsedBalanceCents } from '@/lib/billing/project-balances';
 import { formatAmount } from '@/lib/stripe/utils';
-import OnboardingChecklistCard from '@/components/dashboard/OnboardingChecklistCard';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -48,18 +47,6 @@ type DashboardData = {
     initials: string;
     tone: 'blue' | 'green' | 'purple';
   }>;
-  onboardingProgress: {
-    hubspotAccessCompleted: boolean;
-    documentCompleted: boolean;
-    surveyCompleted: boolean;
-    isHidden: boolean;
-  };
-  onboardingLinks: {
-    hubspotAccessUrl: string;
-    documentUrl: string;
-    surveyUrl: string;
-    videoUrl: string;
-  };
   billing: {
     totalBalance: number;
     usedBalance: number;
@@ -132,18 +119,6 @@ async function loadDashboardData(): Promise<DashboardData> {
   const fallback: DashboardData = {
     activeProjects: [],
     recentActivity: [],
-    onboardingProgress: {
-      hubspotAccessCompleted: false,
-      documentCompleted: false,
-      surveyCompleted: false,
-      isHidden: false,
-    },
-    onboardingLinks: {
-      hubspotAccessUrl: '#',
-      documentUrl: '#',
-      surveyUrl: '#',
-      videoUrl: '#',
-    },
     billing: {
       totalBalance: 0,
       usedBalance: 0,
@@ -172,16 +147,6 @@ async function loadDashboardData(): Promise<DashboardData> {
       )
       .eq('owner_id', user.id)
       .maybeSingle();
-
-    const { data: onboardingProgressRow, error: onboardingError } = await supabase
-      .from('user_onboarding_progress')
-      .select('hubspot_access_completed, document_completed, survey_completed, is_hidden')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (onboardingError) {
-      console.error('[dashboard] Failed to load onboarding progress:', onboardingError);
-    }
 
     const loadProjectsWithScope = async (selectColumns: string) => {
       const query = supabase
@@ -314,18 +279,6 @@ async function loadDashboardData(): Promise<DashboardData> {
     return {
       activeProjects,
       recentActivity,
-      onboardingProgress: {
-        hubspotAccessCompleted: Boolean(onboardingProgressRow?.hubspot_access_completed),
-        documentCompleted: Boolean(onboardingProgressRow?.document_completed),
-        surveyCompleted: Boolean(onboardingProgressRow?.survey_completed),
-        isHidden: Boolean(onboardingProgressRow?.is_hidden),
-      },
-      onboardingLinks: {
-        hubspotAccessUrl: process.env.ONBOARDING_HUBSPOT_ACCESS_URL ?? '#',
-        documentUrl: process.env.ONBOARDING_DOCUMENT_URL ?? '#',
-        surveyUrl: process.env.ONBOARDING_SURVEY_URL ?? '#',
-        videoUrl: process.env.ONBOARDING_VIDEO_URL ?? '#',
-      },
       billing: {
         totalBalance,
         usedBalance,
@@ -359,15 +312,11 @@ export default async function Home() {
     }
   }
 
-  const { activeProjects, recentActivity, onboardingProgress, onboardingLinks, billing } = await loadDashboardData();
+  const { activeProjects, recentActivity, billing } = await loadDashboardData();
 
   return (
     <div className="p-8">
       <h1 className="text-3xl font-semibold text-gray-900 mb-8">Dashboard</h1>
-
-      <div className="mb-6">
-        <OnboardingChecklistCard initialProgress={onboardingProgress} links={onboardingLinks} />
-      </div>
 
       {/* Grid Layout - 2 columns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

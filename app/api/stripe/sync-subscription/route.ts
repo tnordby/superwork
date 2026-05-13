@@ -68,10 +68,8 @@ export async function POST() {
       if (price.recurring?.interval_count === 3) interval = 'quarterly';
       else if (price.recurring?.interval_count === 6) interval = 'biannual';
     }
-    const currentPeriodEndRaw =
-      'current_period_end' in subscription
-        ? (subscription as { current_period_end?: unknown }).current_period_end
-        : null;
+    const item0 = subscription.items.data[0];
+    const currentPeriodEndRaw = item0?.current_period_end;
     const currentPeriodEndIso =
       typeof currentPeriodEndRaw === 'number'
         ? new Date(currentPeriodEndRaw * 1000).toISOString()

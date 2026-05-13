@@ -160,7 +160,7 @@ export default function InvoicesPage() {
         <div className="rounded-2xl border border-gray-200 bg-gray-50 p-12 text-center">
           <p className="text-gray-600">No invoices yet. Invoices will appear here after your first payment.</p>
           <button
-            onClick={() => router.push('/account/plan')}
+            onClick={() => router.push('/plan')}
             className="mt-4 rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
           >
             Add billing plan

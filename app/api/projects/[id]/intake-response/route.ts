@@ -1,4 +1,9 @@
+import { readJsonWithLimit } from '@/lib/api/read-json-body'
 import { createClient } from '@/lib/supabase/server'
+import { assertIntakeMatchesProject } from '@/lib/intake/assert-intake-matches-project'
+import { sanitizeAndValidateIntakeResponses } from '@/lib/intake/sanitize-intake-responses'
+import { logIntakeRouteError } from '@/lib/observability/intake-server-log'
+import { isUuidString } from '@/lib/validation/is-uuid'
 import { NextRequest, NextResponse } from 'next/server'
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role'
 import { isInternalStaff } from '@/lib/auth/platform-role'
@@ -11,9 +16,22 @@ export async function POST(
   try {
     const supabase = await createClient()
     const params = await context.params
-    const body = await request.json()
 
-    const { serviceTemplateId, responses } = body
+    if (!isUuidString(params.id)) {
+      return NextResponse.json({ error: 'Invalid project id' }, { status: 400 })
+    }
+
+    const parsed = await readJsonWithLimit(request)
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+    }
+
+    const body = parsed.value
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Body must be a JSON object' }, { status: 400 })
+    }
+
+    const { serviceTemplateId, responses } = body as Record<string, unknown>
 
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
@@ -29,17 +47,21 @@ export async function POST(
       )
     }
 
-    if (!serviceTemplateId || !responses) {
+    if (
+      typeof serviceTemplateId !== 'string' ||
+      !isUuidString(serviceTemplateId) ||
+      responses === undefined ||
+      responses === null
+    ) {
       return NextResponse.json(
-        { error: 'serviceTemplateId and responses are required' },
+        { error: 'serviceTemplateId (uuid) and responses are required' },
         { status: 400 }
       )
     }
 
-    // Verify the project exists and user has access
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, user_id, workspace_id')
+      .select('id, user_id, workspace_id, service_template_id')
       .eq('id', params.id)
       .single()
 
@@ -50,12 +72,74 @@ export async function POST(
       )
     }
 
+    if (!isInternalStaff(platformRole) && project.user_id !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     if (isInternalStaff(platformRole) && selectedWorkspaceId && project.workspace_id !== selectedWorkspaceId) {
       return NextResponse.json(
         { error: 'Project is outside selected client context' },
         { status: 403 }
       )
     }
+
+    const templateCheck = assertIntakeMatchesProject(project, serviceTemplateId)
+    if (!templateCheck.ok) {
+      return NextResponse.json(
+        { error: templateCheck.error },
+        { status: templateCheck.status }
+      )
+    }
+
+    const { data: intakeFields, error: intakeFieldsError } = await supabase
+      .from('intake_form_fields')
+      .select('field_name, field_type, label, is_required')
+      .eq('service_template_id', serviceTemplateId)
+
+    if (intakeFieldsError) {
+      logIntakeRouteError('intake-response', 'load_fields', intakeFieldsError, {
+        projectId: params.id,
+        serviceTemplateId,
+      })
+      return NextResponse.json({ error: 'Failed to load intake form' }, { status: 500 })
+    }
+
+    if (!intakeFields?.length) {
+      return NextResponse.json(
+        { error: 'No intake form configured for this service template' },
+        { status: 400 }
+      )
+    }
+
+    const { data: intakeConditions, error: intakeConditionsError } = await supabase
+      .from('intake_form_conditions')
+      .select('trigger_field_name, trigger_value, action, target_field_names')
+      .eq('service_template_id', serviceTemplateId)
+      .order('order_index', { ascending: true })
+      .order('id', { ascending: true })
+
+    if (intakeConditionsError) {
+      logIntakeRouteError('intake-response', 'load_conditions', intakeConditionsError, {
+        projectId: params.id,
+        serviceTemplateId,
+      })
+      return NextResponse.json({ error: 'Failed to load intake rules' }, { status: 500 })
+    }
+
+    const validated = sanitizeAndValidateIntakeResponses(
+      intakeFields,
+      intakeConditions ?? [],
+      responses
+    )
+
+    if (!validated.ok) {
+      return NextResponse.json(
+        { error: validated.error },
+        { status: validated.status ?? 400 }
+      )
+    }
+
+    const sanitizedResponses = validated.responses
 
     // Check if response already exists
     const { data: existing } = await supabase
@@ -69,7 +153,7 @@ export async function POST(
       const { data, error } = await supabase
         .from('project_intake_responses')
         .update({
-          responses,
+          responses: sanitizedResponses,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id)
@@ -77,7 +161,10 @@ export async function POST(
         .single()
 
       if (error) {
-        console.error('Error updating intake response:', error)
+        logIntakeRouteError('intake-response', 'update_row', error, {
+          projectId: params.id,
+          serviceTemplateId,
+        })
         return NextResponse.json(
           { error: 'Failed to update intake response' },
           { status: 500 }
@@ -92,13 +179,16 @@ export async function POST(
         .insert({
           project_id: params.id,
           service_template_id: serviceTemplateId,
-          responses,
+          responses: sanitizedResponses,
         })
         .select()
         .single()
 
       if (error) {
-        console.error('Error creating intake response:', error)
+        logIntakeRouteError('intake-response', 'insert_row', error, {
+          projectId: params.id,
+          serviceTemplateId,
+        })
         return NextResponse.json(
           { error: 'Failed to save intake response' },
           { status: 500 }
@@ -108,7 +198,7 @@ export async function POST(
       return NextResponse.json(data)
     }
   } catch (error) {
-    console.error('Error in intake response API:', error)
+    logIntakeRouteError('intake-response', 'post_unexpected', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -123,6 +213,11 @@ export async function GET(
   try {
     const supabase = await createClient()
     const params = await context.params
+
+    if (!isUuidString(params.id)) {
+      return NextResponse.json({ error: 'Invalid project id' }, { status: 400 })
+    }
+
     const { data: { user }, error: userError } = await supabase.auth.getUser()
 
     if (userError || !user) {
@@ -164,7 +259,7 @@ export async function GET(
 
     if (error && error.code !== 'PGRST116') {
       // PGRST116 is "not found" error
-      console.error('Error fetching intake response:', error)
+      logIntakeRouteError('intake-response', 'get_row', error, { projectId: params.id })
       return NextResponse.json(
         { error: 'Failed to fetch intake response' },
         { status: 500 }
@@ -173,7 +268,7 @@ export async function GET(
 
     return NextResponse.json(data || null)
   } catch (error) {
-    console.error('Error in intake response API:', error)
+    logIntakeRouteError('intake-response', 'get_unexpected', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

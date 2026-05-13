@@ -153,7 +153,7 @@ export default function UsagePage() {
         <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
           No active billing plan. Add funds before starting billable projects.
           <button
-            onClick={() => router.push('/account/plan')}
+            onClick={() => router.push('/plan')}
             className="ml-2 font-semibold text-gray-900 underline"
           >
             Go to billing

@@ -29,6 +29,8 @@ import {
   FolderKanban,
   Shield,
   ClipboardList,
+  Zap,
+  Mail,
 } from 'lucide-react';
 import { normalizePlatformRole, isAdmin as isAdminRole, isQuoteManager } from '@/lib/auth/platform-role';
 
@@ -53,6 +55,11 @@ const ALL_CLIENTS_OPTION: ClientSwitcherOption = { id: '__all__', name: 'All cli
 
 const bottomNavigationItems: NavItem[] = [
   {
+    label: 'Talk to Sales',
+    href: 'mailto:sales@superwork.com',
+    icon: Mail,
+  },
+  {
     label: 'Submit feedback',
     href: '/feedback',
     icon: MessageSquare,
@@ -72,13 +79,21 @@ const projectsSection: ExpandableNavItem = {
   ],
 };
 
+const planSection: ExpandableNavItem = {
+  label: 'Plan',
+  icon: Layers,
+  subItems: [
+    { label: 'Subscription', href: '/plan', icon: CreditCard },
+    { label: 'Buy Boosters', href: '/plan/boosters', icon: Zap },
+  ],
+};
+
 const customerAccountSection: ExpandableNavItem = {
   label: 'Account',
   icon: Wallet,
   subItems: [
     { label: 'Balance', href: '/account/balance', icon: CreditCard },
     { label: 'Usage', href: '/account/usage', icon: BarChart3 },
-    { label: 'Plan', href: '/account/plan', icon: Layers },
     { label: 'Invoices', href: '/account/invoices', icon: FileText },
     { label: 'Members', href: '/account/members', icon: Users },
     { label: 'Teams', href: '/account/teams', icon: FolderTree },
@@ -95,7 +110,9 @@ const internalWorkspaceSection: ExpandableNavItem = {
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Projects', 'Account', 'Workspace']));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(['Projects', 'Plan', 'Account', 'Workspace'])
+  );
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { signOut, user, platformRole } = useAuth();
   const [selectedClientId, setSelectedClientId] = useState('');
@@ -161,6 +178,7 @@ export function Sidebar() {
         ...(isAdminRole(effectiveRole) ? [{ label: 'Admin', href: '/admin', icon: Shield }] : []),
         projectsSection,
         { label: 'Inbox', href: '/inbox', icon: Inbox },
+        planSection,
         customerAccountSection,
         { label: 'Assets', href: '/assets', icon: Folder },
       ];
@@ -201,6 +219,9 @@ export function Sidebar() {
   const isActive = (href: string) => {
     if (href === '/') {
       return pathname === '/';
+    }
+    if (href === '/plan') {
+      return pathname === '/plan' || pathname === '/plan/';
     }
     return pathname.startsWith(href);
   };
@@ -415,21 +436,35 @@ export function Sidebar() {
             {bottomNavigationItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
+              const className = `flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                active ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5 hover:text-white'
+              }`;
+              const content = (
+                <>
+                  <Icon className="h-5 w-5" />
+                  {!isCollapsed && <span>{item.label}</span>}
+                </>
+              );
 
               return (
                 <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                      active
-                        ? 'bg-white/10 text-white'
-                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
-                    }`}
-                    title={isCollapsed ? item.label : undefined}
-                  >
-                    <Icon className="h-5 w-5" />
-                    {!isCollapsed && <span>{item.label}</span>}
-                  </Link>
+                  {item.href.startsWith('mailto:') ? (
+                    <a
+                      href={item.href}
+                      className={className}
+                      title={isCollapsed ? item.label : undefined}
+                    >
+                      {content}
+                    </a>
+                  ) : (
+                    <Link
+                      href={item.href}
+                      className={className}
+                      title={isCollapsed ? item.label : undefined}
+                    >
+                      {content}
+                    </Link>
+                  )}
                 </li>
               );
             })}

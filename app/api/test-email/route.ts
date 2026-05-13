@@ -45,7 +45,7 @@ export async function GET(request: Request) {
             day: 'numeric',
             year: 'numeric',
           }),
-          dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL}/account/plan`,
+          dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL}/plan`,
         });
         subject = 'You\'re subscribed — welcome to Advanced';
         templateId = 'BILL-01';
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
             day: 'numeric',
             year: 'numeric',
           }),
-          updatePaymentUrl: `${process.env.NEXT_PUBLIC_APP_URL}/account/plan`,
+          updatePaymentUrl: `${process.env.NEXT_PUBLIC_APP_URL}/plan`,
         });
         subject = 'Action required: your Superwork payment failed';
         templateId = 'BILL-03';

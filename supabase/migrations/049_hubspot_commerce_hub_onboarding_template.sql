@@ -72,70 +72,80 @@ BEGIN
   VALUES (service_id, 'Discovery & Commercial Model', 'Confirm region, legal entity, quote-to-cash process, and target operating model.', 1)
   RETURNING id INTO sop1_id;
   INSERT INTO public.sop_tasks (sop_id, title, description, order_index, estimated_hours, is_required) VALUES
-    (sop1_id, 'Map current quote-to-cash process', 'Document current tools, handoffs, bottlenecks, and control points.', 0, 3, true);
+    (sop1_id, 'Map current quote-to-cash process', 'Document current tools, handoffs, bottlenecks, and control points.', 0, 3, true),
+    (sop1_id, 'Confirm stakeholder owners and RACI for quote-to-cash', 'Assign owners for sales, finance, and RevOps across the commercial workflow.', 1, 4, true);
 
   -- 2) Processor & Payments Architecture
   INSERT INTO public.service_sops (service_template_id, title, description, order_index)
   VALUES (service_id, 'Processor & Payments Architecture', 'Select eligible processor and define payment methods/currencies.', 2)
   RETURNING id INTO sop2_id;
   INSERT INTO public.sop_tasks (sop_id, title, description, order_index, estimated_hours, is_required) VALUES
-    (sop2_id, 'Configure processor architecture', 'Apply region eligibility and finalize HubSpot Payments vs Stripe design.', 0, 5, true);
+    (sop2_id, 'Configure processor architecture', 'Apply region eligibility and finalize HubSpot Payments vs Stripe design.', 0, 5, true),
+    (sop2_id, 'Document PCI scope and settlement cadence', 'Clarify card data flow, settlement timing, and finance reconciliation expectations.', 1, 4, true);
 
   -- 3) Product Catalog & Pricing Foundations
   INSERT INTO public.service_sops (service_template_id, title, description, order_index)
   VALUES (service_id, 'Product Catalog & Pricing Foundations', 'Model SKU catalog, packages, and pricing structures for quoting and invoicing.', 3)
   RETURNING id INTO sop3_id;
   INSERT INTO public.sop_tasks (sop_id, title, description, order_index, estimated_hours, is_required) VALUES
-    (sop3_id, 'Implement product catalog model', 'Create SKU structure and source-of-truth process for product updates.', 0, 5, true);
+    (sop3_id, 'Implement product catalog model', 'Create SKU structure and source-of-truth process for product updates.', 0, 5, true),
+    (sop3_id, 'Define pricing books and discount approval tiers', 'Align list price, bundles, and discount governance with CPQ rules.', 1, 4, true);
 
   -- 4) CPQ & Quote Experience
   INSERT INTO public.service_sops (service_template_id, title, description, order_index)
   VALUES (service_id, 'CPQ & Quote Experience', 'Set up quote templates, optional approvals, and pilot rollout scope.', 4)
   RETURNING id INTO sop4_id;
   INSERT INTO public.sop_tasks (sop_id, title, description, order_index, estimated_hours, is_required) VALUES
-    (sop4_id, 'Configure quote templates and approval flows', 'Implement CPQ scope and governance controls by tier.', 0, 6, true);
+    (sop4_id, 'Configure quote templates and approval flows', 'Implement CPQ scope and governance controls by tier.', 0, 6, true),
+    (sop4_id, 'Pilot CPQ templates with one deal desk', 'Validate templates, line items, and approvals with a narrow pilot before broad rollout.', 1, 4, true);
 
   -- 5) Invoicing & Collections
   INSERT INTO public.service_sops (service_template_id, title, description, order_index)
   VALUES (service_id, 'Invoicing & Collections', 'Configure invoice usage, payment terms, and collection touchpoints.', 5)
   RETURNING id INTO sop5_id;
   INSERT INTO public.sop_tasks (sop_id, title, description, order_index, estimated_hours, is_required) VALUES
-    (sop5_id, 'Set invoice and collections standards', 'Define invoice strategy, terms, and settlement pathways.', 0, 4, true);
+    (sop5_id, 'Set invoice and collections standards', 'Define invoice strategy, terms, and settlement pathways.', 0, 4, true),
+    (sop5_id, 'Configure invoice templates and numbering aligned to accounting', 'Match invoice layout, legal text, and numbering to ERP or policy requirements.', 1, 4, true);
 
   -- 6) Tax & Compliance Controls
   INSERT INTO public.service_sops (service_template_id, title, description, order_index)
   VALUES (service_id, 'Tax & Compliance Controls', 'Design tax calculation ownership and compliance guardrails.', 6)
   RETURNING id INTO sop6_id;
   INSERT INTO public.sop_tasks (sop_id, title, description, order_index, estimated_hours, is_required) VALUES
-    (sop6_id, 'Implement tax and compliance controls', 'Finalize tax ownership model, jurisdictions, and residency constraints.', 0, 5, true);
+    (sop6_id, 'Implement tax and compliance controls', 'Finalize tax ownership model, jurisdictions, and residency constraints.', 0, 5, true),
+    (sop6_id, 'Run tax workshop for jurisdictions and exemptions', 'Validate nexus, B2B reverse charge, and exemption certificate handling.', 1, 4, true);
 
   -- 7) Accounting Integration
   INSERT INTO public.service_sops (service_template_id, title, description, order_index)
   VALUES (service_id, 'Accounting Integration', 'Configure accounting sync direction and middleware strategy.', 7)
   RETURNING id INTO sop7_id;
   INSERT INTO public.sop_tasks (sop_id, title, description, order_index, estimated_hours, is_required) VALUES
-    (sop7_id, 'Configure accounting sync architecture', 'Implement one-way/bidirectional model and integration controls.', 0, 6, true);
+    (sop7_id, 'Configure accounting sync architecture', 'Implement one-way/bidirectional model and integration controls.', 0, 6, true),
+    (sop7_id, 'Map revenue recognition handoff and reconciliation checks', 'Define sync of invoices, payments, and adjustments for month-end close.', 1, 4, true);
 
   -- 8) Security, Roles & Refund Governance
   INSERT INTO public.service_sops (service_template_id, title, description, order_index)
   VALUES (service_id, 'Security, Roles & Refund Governance', 'Set user roles and financial permission boundaries.', 8)
   RETURNING id INTO sop8_id;
   INSERT INTO public.sop_tasks (sop_id, title, description, order_index, estimated_hours, is_required) VALUES
-    (sop8_id, 'Set role-based permissions and refund governance', 'Apply least privilege and finance ownership for refund operations.', 0, 3, true);
+    (sop8_id, 'Set role-based permissions and refund governance', 'Apply least privilege and finance ownership for refund operations.', 0, 3, true),
+    (sop8_id, 'Audit refund permissions and separation of duties', 'Confirm who can issue refunds, voids, and credit memos across HubSpot and ERP.', 1, 4, true);
 
   -- 9) Validation & Pilot
   INSERT INTO public.service_sops (service_template_id, title, description, order_index)
   VALUES (service_id, 'Validation & Pilot', 'Run end-to-end testing and optional team pilot before broad rollout.', 9)
   RETURNING id INTO sop9_id;
   INSERT INTO public.sop_tasks (sop_id, title, description, order_index, estimated_hours, is_required) VALUES
-    (sop9_id, 'Execute validation and pilot', 'Test quote-to-cash path and validate KPI baseline.', 0, 4, true);
+    (sop9_id, 'Execute validation and pilot', 'Test quote-to-cash path and validate KPI baseline.', 0, 4, true),
+    (sop9_id, 'Sign off UAT evidence and pilot KPI baseline', 'Capture test cases, approvals, and before/after metrics for go-live.', 1, 4, true);
 
   -- 10) Launch & Handover
   INSERT INTO public.service_sops (service_template_id, title, description, order_index)
   VALUES (service_id, 'Launch & Handover', 'Go-live, enablement, runbook handover, and post-launch checkpoints.', 10)
   RETURNING id INTO sop10_id;
   INSERT INTO public.sop_tasks (sop_id, title, description, order_index, estimated_hours, is_required) VALUES
-    (sop10_id, 'Run go-live and handover', 'Complete launch checklist and transfer ownership to operations.', 0, 4, true);
+    (sop10_id, 'Run go-live and handover', 'Complete launch checklist and transfer ownership to operations.', 0, 4, true),
+    (sop10_id, 'Deliver 30-day hypercare checkpoint and runbook update', 'Review incidents, tune workflows, and finalize operational runbook.', 1, 4, true);
 
   -- Rebuild intake form for canonical service.
   DELETE FROM public.intake_form_conditions
@@ -211,7 +221,10 @@ BEGIN
     (service_id, 'existing_processor', 'Other', 'show', ARRAY['existing_processor_other']),
     (service_id, 'revenue_model', 'Monthly subscriptions', 'show', ARRAY['subscription_complexity']),
     (service_id, 'revenue_model', 'Annual subscriptions', 'show', ARRAY['subscription_complexity']),
+    (service_id, 'revenue_model', 'Multi-year contracts', 'show', ARRAY['subscription_complexity']),
     (service_id, 'revenue_model', 'Usage-based / metered', 'show', ARRAY['subscription_complexity']),
+    (service_id, 'revenue_model', 'Setup fee + recurring', 'show', ARRAY['subscription_complexity']),
+    (service_id, 'revenue_model', 'Deposits + balance', 'show', ARRAY['subscription_complexity']),
     (service_id, 'cpq_scope', 'Yes — full CPQ rollout', 'show', ARRAY['approval_workflows_needed', 'quote_template_assets_ready', 'pilot_scope']),
     (service_id, 'cpq_scope', 'Yes — basic quotes only', 'show', ARRAY['quote_template_assets_ready']),
     (service_id, 'tax_handling', 'Native HubSpot tax (simple flat rate)', 'show', ARRAY['tax_jurisdictions']),
@@ -221,17 +234,18 @@ BEGIN
     (service_id, 'accounting_system', 'PowerOffice', 'show', ARRAY['existing_middleware']),
     (service_id, 'accounting_system', '24SevenOffice', 'show', ARRAY['existing_middleware']),
     (service_id, 'accounting_system', 'Xledger', 'show', ARRAY['existing_middleware']),
-    (service_id, 'accounting_system', 'Visma', 'show', ARRAY['existing_middleware']);
+    (service_id, 'accounting_system', 'Visma', 'show', ARRAY['existing_middleware']),
+    (service_id, 'accounting_system', 'NetSuite', 'show', ARRAY['existing_middleware']);
 END $$;
 
 -- Verification
 -- Expected:
 -- - service row: 1 (name = HubSpot Commerce Hub Onboarding, category = HubSpot Services, is_active = true)
 -- - sop_count: 10
--- - total_task_count: 10
+-- - total_task_count: 20
 -- - total_field_count: 33
 -- - required_field_count: 20
--- - condition_count: 17
+-- - condition_count: 21
 SELECT
   st.id,
   st.name,
