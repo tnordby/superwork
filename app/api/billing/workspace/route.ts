@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getCustomerInvoices } from '@/lib/stripe/helpers';
+import { resolveCustomerWorkspaceContext } from '@/lib/account/customer-workspace-context';
+import { tryCreateServiceRoleClient } from '@/lib/supabase/admin';
+import { stripe } from '@/lib/stripe/config';
+import { currentPeriodEndIsoFromSubscription, getCustomerInvoices } from '@/lib/stripe/helpers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,13 +18,14 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const workspaceId = searchParams.get('workspaceId');
+    let workspaceId = searchParams.get('workspaceId');
 
     if (!workspaceId) {
-      return NextResponse.json(
-        { error: 'Workspace ID is required' },
-        { status: 400 }
-      );
+      const ctx = await resolveCustomerWorkspaceContext(user.id);
+      if ('error' in ctx) {
+        return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+      }
+      workspaceId = ctx.workspace.id;
     }
 
     // Get workspace details
@@ -44,7 +48,7 @@ export async function GET(request: NextRequest) {
       .select('role')
       .eq('workspace_id', workspaceId)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     const isOwner = workspace.owner_id === user.id;
     const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
@@ -56,14 +60,36 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    let workspaceOut = workspace;
+    if (workspace.stripe_subscription_id) {
+      try {
+        const subscription = await stripe.subscriptions.retrieve(workspace.stripe_subscription_id);
+        const freshEnd = currentPeriodEndIsoFromSubscription(subscription);
+        if (freshEnd) {
+          if (freshEnd !== workspace.current_period_end) {
+            const admin = tryCreateServiceRoleClient();
+            if (admin) {
+              await admin
+                .from('workspaces')
+                .update({ current_period_end: freshEnd })
+                .eq('id', workspace.id);
+            }
+          }
+          workspaceOut = { ...workspace, current_period_end: freshEnd };
+        }
+      } catch (error) {
+        console.error('[billing/workspace] refresh current_period_end from Stripe', error);
+      }
+    }
+
     // Get invoices if customer exists
     let invoices: Awaited<ReturnType<typeof getCustomerInvoices>> = [];
-    if (workspace.stripe_customer_id) {
-      invoices = await getCustomerInvoices(workspace.stripe_customer_id);
+    if (workspaceOut.stripe_customer_id) {
+      invoices = await getCustomerInvoices(workspaceOut.stripe_customer_id);
     }
 
     return NextResponse.json({
-      workspace,
+      workspace: workspaceOut,
       invoices,
     });
   } catch (error) {

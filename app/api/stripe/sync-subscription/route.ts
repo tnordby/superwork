@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe/config';
 import { createClient } from '@/lib/supabase/server';
-import { getTotalAmountPaidForSubscription } from '@/lib/stripe/helpers';
+import { getTotalAmountPaidForSubscription, currentPeriodEndIsoFromSubscription } from '@/lib/stripe/helpers';
 
 export async function POST() {
   try {
@@ -68,12 +68,7 @@ export async function POST() {
       if (price.recurring?.interval_count === 3) interval = 'quarterly';
       else if (price.recurring?.interval_count === 6) interval = 'biannual';
     }
-    const item0 = subscription.items.data[0];
-    const currentPeriodEndRaw = item0?.current_period_end;
-    const currentPeriodEndIso =
-      typeof currentPeriodEndRaw === 'number'
-        ? new Date(currentPeriodEndRaw * 1000).toISOString()
-        : null;
+    const currentPeriodEndIso = currentPeriodEndIsoFromSubscription(subscription);
 
     // Update workspace with subscription details
     const { error: updateError } = await supabase

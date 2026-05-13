@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
@@ -18,7 +18,6 @@ import {
   Circle,
   Loader2,
   Mail,
-  MessageCircle,
   CalendarClock,
   ChevronDown,
   ChevronRight,
@@ -132,15 +131,6 @@ export default function ProjectDetailPage() {
   const [viewingClientName, setViewingClientName] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const { platformRole } = useAuth();
-
-  const projectInboxHref = useMemo(() => {
-    if (!project) return '/inbox';
-    const p = new URLSearchParams({ projectId: project.id });
-    if (typeof project.assignee === 'string' && project.assignee.trim()) {
-      p.set('consultantName', project.assignee.trim());
-    }
-    return `/inbox?${p.toString()}`;
-  }, [project]);
 
   useEffect(() => {
     if (!project?.workspace_id) {
@@ -777,29 +767,19 @@ export default function ProjectDetailPage() {
                 <User className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                 <p className="text-sm text-gray-700">No lead consultant assigned yet.</p>
                 <p className="mt-1 text-xs text-gray-600">
-                  You can still message our team about this project from your inbox.
+                  Email us about this project anytime; we will route it to the right person.
                 </p>
               </div>
             )}
 
             <div className="space-y-2">
-              {project.assignee ? (
-                <a
-                  href={`mailto:consultant@superwork.com?subject=Project: ${project.name}`}
-                  className="flex items-center gap-3 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  <Mail className="h-4 w-4 text-gray-600" />
-                  <span>Send email</span>
-                </a>
-              ) : null}
-
-              <Link
-                href={projectInboxHref}
+              <a
+                href={`mailto:consultant@superwork.com?subject=Project: ${encodeURIComponent(project.name)}`}
                 className="flex items-center gap-3 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
               >
-                <MessageCircle className="h-4 w-4 text-gray-600" />
-                <span>Open messages</span>
-              </Link>
+                <Mail className="h-4 w-4 text-gray-600" />
+                <span>{project.assignee ? 'Send email' : 'Email our team'}</span>
+              </a>
 
               <a
                 href="https://calendly.com/superwork-consultant"

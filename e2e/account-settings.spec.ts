@@ -14,7 +14,7 @@ test.describe('Account settings', () => {
 
     await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible();
     await expect(
-      page.getByRole('checkbox', { name: /New inbox message emails/i })
+      page.getByRole('checkbox', { name: /New project message emails/i })
     ).toBeVisible({ timeout: 15_000 });
 
     await expect(page.getByRole('heading', { name: 'Person of reference' })).toBeVisible();

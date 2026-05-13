@@ -8,7 +8,11 @@ import {
 } from '@/lib/account/customer-workspace-context';
 import {
   assertValidSubscriptionMonthly,
+  capacityBillingPeriodFromStripeRecurring,
+  commitmentPeriodChargeCents,
   hoursFromBudgetEur,
+  stripeRecurringForCapacityPeriod,
+  type CapacityBillingPeriod,
 } from '@/lib/billing/capacity-pricing';
 
 /**
@@ -113,19 +117,18 @@ export async function POST(request: NextRequest) {
     }
 
     const currentPrice = await stripe.prices.retrieve(item.price.id);
-    const annualPrepay = currentPrice.recurring?.interval === 'year';
+    const recurring = currentPrice.recurring;
+    const billingPeriod: CapacityBillingPeriod =
+      capacityBillingPeriodFromStripeRecurring(recurring?.interval, recurring?.interval_count ?? undefined) ??
+      (recurring?.interval === 'year' ? 'annual' : 'monthly');
 
-    const newUnitAmountCents = annualPrepay
-      ? Math.round(newMonthly * 12 * (1 - 0.08) * 100)
-      : Math.round(newMonthly * 100);
+    const newUnitAmountCents = commitmentPeriodChargeCents(newMonthly, billingPeriod);
 
     const newPrice = await stripe.prices.create({
       product: productId,
       currency: 'eur',
       unit_amount: newUnitAmountCents,
-      recurring: annualPrepay
-        ? { interval: 'year', interval_count: 1 }
-        : { interval: 'month', interval_count: 1 },
+      recurring: stripeRecurringForCapacityPeriod(billingPeriod),
     });
 
     const subId = subscription.id;
@@ -164,7 +167,8 @@ export async function POST(request: NextRequest) {
         ...subscription.metadata,
         workspace_id: workspaceId,
         monthly_budget_eur: String(newMonthly),
-        annual_prepay: annualPrepay ? 'true' : 'false',
+        billing_period: billingPeriod,
+        annual_prepay: billingPeriod === 'annual' ? 'true' : 'false',
         pricing_model: terms?.pricing_model === 'legacy_tier' ? 'slider_v1' : terms?.pricing_model ?? 'slider_v1',
       },
     });
@@ -181,7 +185,8 @@ export async function POST(request: NextRequest) {
           workspace_id: workspaceId,
           monthly_budget_eur: newMonthly,
           monthly_hours: hoursFromBudgetEur(newMonthly),
-          annual_prepay: annualPrepay,
+          annual_prepay: billingPeriod === 'annual',
+          capacity_billing_period: billingPeriod,
           pricing_model:
             terms?.pricing_model === 'legacy_tier' ? 'slider_v1' : terms?.pricing_model ?? 'slider_v1',
           committed_monthly_floor_eur: preservedCommitted,

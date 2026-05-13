@@ -5,7 +5,11 @@ import {
   customerCanManageBilling,
   resolveCustomerWorkspaceContext,
 } from '@/lib/account/customer-workspace-context';
-import { assertValidBoosterAmount, hoursFromBudgetEur } from '@/lib/billing/capacity-pricing';
+import {
+  assertValidBoosterAmount,
+  hoursFromBudgetEur,
+  monthlyBudgetFromStripeRecurringUnitAmount,
+} from '@/lib/billing/capacity-pricing';
 import { computeBoosterValidity } from '@/lib/billing/booster-validity';
 
 export async function POST(request: NextRequest) {
@@ -70,12 +74,17 @@ export async function POST(request: NextRequest) {
       }
       const sub = await stripe.subscriptions.retrieve(workspace.stripe_subscription_id as string);
       const price = sub.items.data[0]?.price;
-      if (price?.recurring?.interval === 'month' && price.unit_amount != null) {
-        monthlySubscriptionEur = price.unit_amount / 100;
-      } else if (price?.recurring?.interval === 'year' && price.unit_amount != null) {
-        const annualMajor = price.unit_amount / 100;
-        monthlySubscriptionEur = Math.round((annualMajor / 12 / 0.92) * 100) / 100;
-      } else {
+      if (price?.unit_amount != null && price.recurring) {
+        const inferred = monthlyBudgetFromStripeRecurringUnitAmount(
+          price.unit_amount,
+          price.recurring.interval,
+          price.recurring.interval_count ?? undefined
+        );
+        if (inferred != null && inferred > 0) {
+          monthlySubscriptionEur = inferred;
+        }
+      }
+      if (!Number.isFinite(monthlySubscriptionEur) || monthlySubscriptionEur <= 0) {
         return NextResponse.json(
           { error: 'Could not determine monthly subscription amount for boosters.' },
           { status: 400 }

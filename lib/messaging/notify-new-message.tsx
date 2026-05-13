@@ -82,7 +82,7 @@ export async function notifyNewInboxMessage(params: NotifyNewInboxMessageParams)
     if (projectError) throw projectError;
     const projectName = typeof project?.name === 'string' && project.name.trim() ? project.name.trim() : 'Project';
 
-    const inboxUrl = `${appBaseUrl()}/inbox`;
+    const projectUrl = `${appBaseUrl()}/projects/${encodeURIComponent(params.projectId)}`;
     const preview =
       params.preview.length > 280 ? `${params.preview.slice(0, 277).trimEnd()}…` : params.preview;
     const previewFingerprint = fingerprintInboxPreview(preview);
@@ -136,7 +136,7 @@ export async function notifyNewInboxMessage(params: NotifyNewInboxMessageParams)
               projectName={projectName}
               senderName={params.senderName}
               preview={preview}
-              inboxUrl={`${inboxUrl}?projectId=${encodeURIComponent(params.projectId)}`}
+              projectUrl={projectUrl}
             />
           ),
           templateId: 'new_inbox_message',

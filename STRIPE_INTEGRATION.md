@@ -299,28 +299,57 @@ stripe trigger invoice.payment_failed
 
 ## Going Live
 
-Before launching to production:
+Stripe does not have a separate “test mode flag” in the app: **whatever API keys you deploy determine test vs live**. Live secret keys only talk to live Customers, Subscriptions, and Products.
 
-1. **Switch to live keys**:
-   - Replace test keys with live keys in `.env.local`
-   - Update webhook endpoint URL to production domain
+### 1. Stripe Dashboard (Live mode)
 
-2. **Update webhook endpoint**:
-   - Add production webhook endpoint in Stripe Dashboard
-   - Update `STRIPE_WEBHOOK_SECRET` with new signing secret
+1. Turn **“Viewing test data”** **off** in the Dashboard.
+2. **Developers → API keys**: copy the **live** Secret key and Publishable key.
+3. **Products**: create (or duplicate from test) the capacity product and any catalog you rely on. Copy the **live** Product ID for `STRIPE_SUPERWORK_CAPACITY_PRODUCT_ID`. Test product IDs (`prod_…` from test mode) **cannot** be used with live keys.
 
-3. **Test production checkout**:
-   - Create a real subscription (you can cancel immediately)
-   - Verify webhook events are received
-   - Test Customer Portal
+### 2. Hosting environment (e.g. Vercel Production)
 
-4. **Enable Stripe Tax** (optional):
-   - Dashboard → Settings → Tax
-   - Automatic tax calculation for compliance
+Set:
 
-5. **Configure invoice emails**:
-   - Dashboard → Settings → Emails
-   - Customize invoice and receipt emails
+| Variable | Notes |
+|----------|--------|
+| `STRIPE_SECRET_KEY` | `sk_live_…` |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_live_…` |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret from the **live** webhook endpoint (not the Stripe CLI `whsec_` used for local test forwarding unless you only receive test events). |
+| `STRIPE_SUPERWORK_CAPACITY_PRODUCT_ID` | Live `prod_…` for capacity checkout / subscription change. |
+| `NEXT_PUBLIC_APP_URL` | Public production origin (no trailing path). Used for Checkout success/cancel URLs, portal `return_url`, and booster redirects. |
+
+Keep **Preview** / **Development** environments on **test** keys if you still need test checkouts there; use **Production** only for live keys.
+
+### 3. Webhooks (live endpoint)
+
+1. **Developers → Webhooks → Add endpoint** while **not** viewing test data.
+2. URL: `https://<your-production-domain>/api/stripe/webhook`
+3. Subscribe to the same events as in [Configure Stripe Webhooks](#5-configure-stripe-webhooks) (e.g. `checkout.session.completed`, subscription and invoice events).
+4. Copy that endpoint’s **Signing secret** into `STRIPE_WEBHOOK_SECRET` for production.
+5. Confirm deliveries in the Dashboard after the first real payment.
+
+### 4. Database vs Stripe mode (important)
+
+Rows in `workspaces` store `stripe_customer_id`, `stripe_subscription_id`, `stripe_price_id`, etc. Those IDs are **mode-specific**: IDs created in **test** mode are **invalid** when the app calls Stripe with **live** keys (and the reverse).
+
+Before charging real customers on production:
+
+- Use a **production** database that never had test-mode Stripe IDs written from a live-key deployment, **or**
+- Explicitly clear or reconcile test IDs for any workspace that should subscribe again in live mode (treat as a data migration; coordinate with finance/ops).
+
+Booster one-time Checkout lines use inline `price_data` / `product_data` and do not need an extra product env var, but they still require a **live** subscription/customer on the workspace when applicable.
+
+### 5. Smoke test on production
+
+1. Run one small real Checkout (then cancel in the Portal if you want).
+2. Confirm webhook delivery and that `workspaces` / `workspace_plan_terms` / boosters update as expected.
+3. Open the Customer Portal from the app and verify `return_url` lands on your real domain.
+
+### 6. Optional: tax and emails
+
+1. **Stripe Tax** (optional): Dashboard → Settings → Tax.
+2. **Customer emails**: Dashboard → Settings → Emails — tune invoices and receipts.
 
 ## Additional Resources
 

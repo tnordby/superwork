@@ -11,11 +11,14 @@ import {
   SUBSCRIPTION_MONTHLY_MAX_EUR,
   SUBSCRIPTION_MONTHLY_MIN_EUR,
   SUBSCRIPTION_STEP_EUR,
-  annualAmountEur,
-  annualPrepaySavingsEur,
+  commitmentGrossEur,
+  commitmentPeriodChargeEur,
+  commitmentSavingsVsGrossEur,
+  parseCapacityBillingPeriod,
   subscriptionMonthlyFromSliderIndex,
   subscriptionSliderIndexCount,
   subscriptionSliderIndexFromMonthly,
+  type CapacityBillingPeriod,
 } from '@/lib/billing/capacity-pricing';
 
 type WorkspaceRow = {
@@ -32,6 +35,7 @@ type PlanTerms = {
   monthly_budget_eur: number;
   monthly_hours?: number;
   annual_prepay: boolean;
+  capacity_billing_period?: string | null;
   pricing_model: string;
   legacy_tier?: string | null;
   committed_monthly_floor_eur?: number | null;
@@ -46,6 +50,7 @@ type PlanContextResponse = {
     billingAnchorCents: number | null;
     currency: string;
     interval: string | null;
+    intervalCount?: number | null;
   };
   effectiveMonthlyEur: number | null;
   canManageBilling: boolean;
@@ -60,6 +65,17 @@ function formatEurMajor(amountEur: number): string {
   }).format(amountEur);
 }
 
+const SUBSCRIBE_BILLING_OPTIONS: {
+  id: CapacityBillingPeriod;
+  label: string;
+  description: string;
+}[] = [
+  { id: 'monthly', label: 'Monthly', description: 'Billed every month — full flexibility' },
+  { id: 'quarterly', label: 'Quarterly', description: 'Billed every 3 months — 2% off vs. paying monthly' },
+  { id: 'biannual', label: 'Bi-annual', description: 'Billed every 6 months — 5% off' },
+  { id: 'annual', label: 'Annual', description: 'Billed once per year — 8% off' },
+];
+
 function clampSubscriptionIndexFromMonthly(monthly: number): number {
   const snapped =
     SUBSCRIPTION_MONTHLY_MIN_EUR +
@@ -72,13 +88,41 @@ function clampSubscriptionIndexFromMonthly(monthly: number): number {
   }
 }
 
+function BoosterUpsellCard({ onBuyBoosters }: { onBuyBoosters: () => void }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+      <h2 className="text-xl font-semibold text-gray-900">Capacity boosters</h2>
+      <div className="mt-3 min-h-0 flex-1 space-y-3 text-sm leading-relaxed text-gray-600">
+        <p>
+          A booster is a one-off payment that adds extra delivery capacity on top of your current plan. Your
+          subscription amount stays the same, and boosters do not auto-renew.
+        </p>
+        <p>
+          Use them for a short-term bump—such as a launch or migration—when you need more capacity without scheduling a
+          higher monthly amount.
+        </p>
+      </div>
+      <div className="mt-8 shrink-0">
+        <button
+          type="button"
+          onClick={onBuyBoosters}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+        >
+          <Zap className="h-5 w-5 shrink-0" aria-hidden />
+          Buy boosters
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function PlanPage() {
   const router = useRouter();
   const [ctx, setCtx] = useState<PlanContextResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
   const [subIdx, setSubIdx] = useState(0);
-  const [annualPrepay, setAnnualPrepay] = useState(false);
+  const [billingPeriod, setBillingPeriod] = useState<CapacityBillingPeriod>('monthly');
   const [changeIdx, setChangeIdx] = useState(0);
   const [managingBilling, setManagingBilling] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -97,7 +141,14 @@ export default function PlanPage() {
       const base = data.effectiveMonthlyEur ?? SUBSCRIPTION_MONTHLY_MIN_EUR;
       setSubIdx(clampSubscriptionIndexFromMonthly(base));
       setChangeIdx(clampSubscriptionIndexFromMonthly(base));
-      if (data.planTerms?.annual_prepay) setAnnualPrepay(true);
+      const fromTerms = parseCapacityBillingPeriod(data.planTerms?.capacity_billing_period);
+      if (fromTerms) {
+        setBillingPeriod(fromTerms);
+      } else if (data.planTerms?.annual_prepay) {
+        setBillingPeriod('annual');
+      } else {
+        setBillingPeriod('monthly');
+      }
     } catch (e) {
       setPageError(e instanceof Error ? e.message : 'Failed to load plan');
     } finally {
@@ -163,7 +214,7 @@ export default function PlanPage() {
           workspaceId: ctx.workspace.id,
           capacityCheckout: {
             monthlyBudgetEur: subscribeMonthly,
-            annualPrepay,
+            billingPeriod,
           },
         }),
       });
@@ -454,17 +505,7 @@ export default function PlanPage() {
             </div>
 
             <div className="min-h-0 min-w-0 lg:flex lg:h-full lg:flex-col">
-              <div className="flex h-full min-h-0 flex-col justify-center rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-                <p className="text-sm text-gray-700">Need a short-term capacity expansion?</p>
-                <button
-                  type="button"
-                  onClick={() => router.push('/plan/boosters')}
-                  className="mt-3 inline-flex items-center justify-center gap-2 text-sm font-semibold text-gray-900 underline-offset-2 hover:underline"
-                >
-                  <Zap className="h-4 w-4" aria-hidden />
-                  Buy Boosters
-                </button>
-              </div>
+              <BoosterUpsellCard onBuyBoosters={() => router.push('/plan/boosters')} />
             </div>
           </div>
         ) : (
@@ -543,17 +584,7 @@ export default function PlanPage() {
             </div>
 
             <div className="min-h-0 min-w-0 lg:col-start-2 lg:row-span-2 lg:flex lg:h-full lg:flex-col">
-              <div className="flex h-full min-h-0 flex-col justify-center rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-                <p className="text-sm text-gray-700">Need a short-term capacity expansion?</p>
-                <button
-                  type="button"
-                  onClick={() => router.push('/plan/boosters')}
-                  className="mt-3 inline-flex items-center justify-center gap-2 text-sm font-semibold text-gray-900 underline-offset-2 hover:underline"
-                >
-                  <Zap className="h-4 w-4" aria-hidden />
-                  Buy Boosters
-                </button>
-              </div>
+              <BoosterUpsellCard onBuyBoosters={() => router.push('/plan/boosters')} />
             </div>
 
             <div className="min-h-0 min-w-0 lg:flex lg:h-full lg:flex-col">
@@ -603,31 +634,52 @@ export default function PlanPage() {
               Pay for the capacity you need. Starting at €4,000/month.
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-sm text-gray-600 lg:mx-0">
-              One subscription covers platform access and delivery capacity. No separate platform fee — annual
-              commitment, with optional annual prepay savings.
+              One subscription covers platform access and delivery capacity. Choose monthly billing or commit to
+              quarterly, bi-annual, or annual cycles with prepay savings.
             </p>
           </div>
 
           <div className="flex min-h-0 flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8 lg:h-full lg:min-h-0">
             <div className="grid min-h-0 flex-1 grid-cols-1 gap-8 xl:grid-cols-2 xl:items-stretch xl:gap-8">
               <div className="flex min-h-0 flex-1 flex-col xl:h-full">
-                <div className="flex flex-wrap items-end justify-between gap-4">
+                <div className="flex flex-col gap-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Monthly subscription</p>
+                    <p className="text-sm font-medium text-gray-600">Monthly capacity (subscription basis)</p>
                     <p className="text-4xl font-bold text-gray-900">{formatEurMajor(subscribeMonthly)}</p>
                     <p className="mt-1 text-sm text-gray-500">
                       €500 steps · up to {formatEurMajor(SUBSCRIPTION_MONTHLY_MAX_EUR)} in-app
                     </p>
                   </div>
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-800">
-                    <input
-                      type="checkbox"
-                      checked={annualPrepay}
-                      onChange={(e) => setAnnualPrepay(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 accent-gray-900"
-                    />
-                    Annual prepay (8% off)
-                  </label>
+                  <fieldset className="space-y-2">
+                    <legend className="text-sm font-medium text-gray-800">Billing cycle</legend>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {SUBSCRIBE_BILLING_OPTIONS.map((opt) => (
+                        <label
+                          key={opt.id}
+                          className={`flex cursor-pointer flex-col rounded-lg border p-3 text-left text-sm transition-colors ${
+                            billingPeriod === opt.id
+                              ? 'border-gray-900 bg-gray-50 ring-1 ring-gray-900'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <span className="flex items-start gap-2">
+                            <input
+                              type="radio"
+                              name="billing-period"
+                              value={opt.id}
+                              checked={billingPeriod === opt.id}
+                              onChange={() => setBillingPeriod(opt.id)}
+                              className="mt-0.5 h-4 w-4 border-gray-300 accent-gray-900"
+                            />
+                            <span>
+                              <span className="font-semibold text-gray-900">{opt.label}</span>
+                              <span className="mt-0.5 block text-xs font-normal text-gray-600">{opt.description}</span>
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
                 </div>
 
                 <div className="mt-8">
@@ -651,27 +703,25 @@ export default function PlanPage() {
                 <div className="mt-8 grid gap-4 rounded-xl bg-gray-50 p-6 sm:grid-cols-2">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                      Annual commitment (gross)
+                      {billingPeriod === 'monthly' ? 'Each invoice' : 'Gross before discount'}
                     </p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {formatEurMajor(annualAmountEur(subscribeMonthly, false))}
+                      {formatEurMajor(commitmentGrossEur(subscribeMonthly, billingPeriod))}
                     </p>
                   </div>
-                  {annualPrepay ? (
-                    <>
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Annual prepay total</p>
-                        <p className="text-2xl font-semibold text-gray-900">
-                          {formatEurMajor(annualAmountEur(subscribeMonthly, true))}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">You save</p>
-                        <p className="text-2xl font-semibold text-emerald-700">
-                          {formatEurMajor(annualPrepaySavingsEur(subscribeMonthly))}
-                        </p>
-                      </div>
-                    </>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">You pay per cycle</p>
+                    <p className="text-2xl font-semibold text-gray-900">
+                      {formatEurMajor(commitmentPeriodChargeEur(subscribeMonthly, billingPeriod))}
+                    </p>
+                  </div>
+                  {commitmentSavingsVsGrossEur(subscribeMonthly, billingPeriod) > 0 ? (
+                    <div className="sm:col-span-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">You save vs. undiscounted</p>
+                      <p className="text-2xl font-semibold text-emerald-700">
+                        {formatEurMajor(commitmentSavingsVsGrossEur(subscribeMonthly, billingPeriod))}
+                      </p>
+                    </div>
                   ) : null}
                 </div>
               </div>

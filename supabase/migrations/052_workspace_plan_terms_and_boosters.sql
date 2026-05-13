@@ -5,6 +5,8 @@ create table if not exists public.workspace_plan_terms (
   monthly_budget_eur numeric(12,2) not null check (monthly_budget_eur >= 0),
   monthly_hours numeric(10,2) not null,
   annual_prepay boolean not null default false,
+  capacity_billing_period text not null default 'monthly'
+    check (capacity_billing_period in ('monthly', 'quarterly', 'biannual', 'annual')),
   pricing_model text not null check (pricing_model in ('slider_v1', 'legacy_tier', 'enterprise_custom')),
   legacy_tier text,
   committed_monthly_floor_eur numeric(12,2),
@@ -16,6 +18,9 @@ create table if not exists public.workspace_plan_terms (
 );
 
 comment on table public.workspace_plan_terms is 'Canonical portal subscription capacity (EUR) and pricing model; Stripe remains payment source of truth.';
+
+comment on column public.workspace_plan_terms.capacity_billing_period is
+  'Stripe billing cadence for the capacity subscription (monthly, quarterly, biannual, annual).';
 
 create table if not exists public.workspace_boosters (
   id uuid default gen_random_uuid() primary key,

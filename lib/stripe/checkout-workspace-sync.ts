@@ -1,7 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
 import {
+  capacityBillingPeriodFromStripeRecurring,
   hoursFromBudgetEur,
+  monthlyBudgetFromStripeRecurringUnitAmount,
+  parseCapacityBillingPeriod,
+  type CapacityBillingPeriod,
   type PricingModel,
 } from '@/lib/billing/capacity-pricing';
 
@@ -14,12 +18,13 @@ function monthlyBudgetFromSubscription(
     const n = Number(meta);
     if (Number.isFinite(n) && n > 0) return n;
   }
-  if (price?.unit_amount != null && price.recurring?.interval === 'month') {
-    return price.unit_amount / 100;
-  }
-  if (price?.unit_amount != null && price.recurring?.interval === 'year') {
-    const annualMajor = price.unit_amount / 100;
-    return Math.round((annualMajor / 12 / 0.92) * 100) / 100;
+  if (price?.unit_amount != null && price.recurring) {
+    const fromStripe = monthlyBudgetFromStripeRecurringUnitAmount(
+      price.unit_amount,
+      price.recurring.interval,
+      price.recurring.interval_count ?? undefined
+    );
+    if (fromStripe != null && fromStripe > 0) return fromStripe;
   }
   return 0;
 }
@@ -49,10 +54,25 @@ export async function upsertWorkspacePlanTermsFromSubscriptionCheckout(params: {
         ? monthlyFromSub
         : (price.unit_amount ?? 0) / 100;
 
-  const annualPrepay =
-    sessionMetadata?.annual_prepay === 'true' ||
-    subscription.metadata?.annual_prepay === 'true' ||
-    price.recurring?.interval === 'year';
+  const fromMeta =
+    parseCapacityBillingPeriod(sessionMetadata?.billing_period) ??
+    parseCapacityBillingPeriod(subscription.metadata?.billing_period);
+  const fromPrice =
+    price.recurring != null
+      ? capacityBillingPeriodFromStripeRecurring(
+          price.recurring.interval,
+          price.recurring.interval_count ?? undefined
+        )
+      : null;
+  const fromLegacyAnnual =
+    sessionMetadata?.annual_prepay === 'true' || subscription.metadata?.annual_prepay === 'true';
+  const capacityPeriod: CapacityBillingPeriod =
+    fromMeta ??
+    fromPrice ??
+    (fromLegacyAnnual ? 'annual' : null) ??
+    (price.recurring?.interval === 'year' ? 'annual' : 'monthly');
+
+  const annualPrepay = capacityPeriod === 'annual';
 
   let pricingModel: PricingModel = 'legacy_tier';
   if (checkoutKind === 'capacity_subscription' || subscription.metadata?.checkout_kind === 'capacity_subscription') {
@@ -87,6 +107,7 @@ export async function upsertWorkspacePlanTermsFromSubscriptionCheckout(params: {
       monthly_budget_eur: monthlyBudget,
       monthly_hours: hoursFromBudgetEur(monthlyBudget),
       annual_prepay: Boolean(annualPrepay),
+      capacity_billing_period: capacityPeriod,
       pricing_model: pricingModel,
       legacy_tier: legacyTier,
       committed_monthly_floor_eur: committedFloor,

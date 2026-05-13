@@ -5,8 +5,9 @@ import {
   sumCommittedBalanceCents,
   sumUsedBalanceCents,
 } from '@/lib/billing/project-balances';
+import { monthlyBudgetFromStripeRecurringUnitAmount } from '@/lib/billing/capacity-pricing';
 import { stripe } from '@/lib/stripe/config';
-import { getTotalAmountPaidForSubscription } from '@/lib/stripe/helpers';
+import { getTotalAmountPaidForSubscription, currentPeriodEndIsoFromSubscription } from '@/lib/stripe/helpers';
 
 export async function GET() {
   try {
@@ -56,6 +57,7 @@ export async function GET() {
     let billingAnchorCents: number | null = null;
     let stripeCurrency = 'eur';
     let stripeInterval: string | null = null;
+    let stripeIntervalCount: number | null = null;
 
     if (workspace.stripe_subscription_id && process.env.STRIPE_SECRET_KEY) {
       try {
@@ -66,6 +68,16 @@ export async function GET() {
         billingAnchorCents = paid.totalCents > 0 ? paid.totalCents : (price?.unit_amount ?? null);
         stripeCurrency = paid.totalCents > 0 ? paid.currency : price?.currency ?? 'eur';
         stripeInterval = price?.recurring?.interval ?? null;
+        stripeIntervalCount = price?.recurring?.interval_count ?? null;
+
+        const freshEnd = currentPeriodEndIsoFromSubscription(subscription);
+        if (freshEnd && freshEnd !== workspace.current_period_end) {
+          await ctx.admin
+            .from('workspaces')
+            .update({ current_period_end: freshEnd })
+            .eq('id', workspace.id);
+          workspace.current_period_end = freshEnd;
+        }
       } catch {
         stripePerPeriodCents = null;
         billingAnchorCents = null;
@@ -78,13 +90,16 @@ export async function GET() {
     let effectiveMonthlyEur = effectiveMonthlyFromTerms;
     if (
       (effectiveMonthlyEur == null || !Number.isFinite(effectiveMonthlyEur)) &&
-      stripePerPeriodCents != null
+      stripePerPeriodCents != null &&
+      stripeInterval
     ) {
-      if (stripeInterval === 'year') {
-        const annualMajor = stripePerPeriodCents / 100;
-        effectiveMonthlyEur = Math.round((annualMajor / 12 / 0.92) * 100) / 100;
-      } else {
-        effectiveMonthlyEur = stripePerPeriodCents / 100;
+      const fromStripe = monthlyBudgetFromStripeRecurringUnitAmount(
+        stripePerPeriodCents,
+        stripeInterval,
+        stripeIntervalCount ?? undefined
+      );
+      if (fromStripe != null && fromStripe > 0) {
+        effectiveMonthlyEur = fromStripe;
       }
     }
 
@@ -96,6 +111,7 @@ export async function GET() {
         billingAnchorCents,
         currency: stripeCurrency,
         interval: stripeInterval,
+        intervalCount: stripeIntervalCount,
       },
       effectiveMonthlyEur: effectiveMonthlyEur && Number.isFinite(effectiveMonthlyEur) ? effectiveMonthlyEur : null,
       canManageBilling: customerCanManageBilling(ctx),

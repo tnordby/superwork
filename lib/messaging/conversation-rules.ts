@@ -28,8 +28,7 @@ export function checkCustomerConsultantName(
     return {
       allowed: false,
       status: 400,
-      message:
-        'This project does not have a named contact yet. Choose “Your Superwork team” in the inbox to message us.',
+      message: `This project does not have a named contact yet. Use “${DEFAULT_TEAM_CONTACT_NAME}” as the contact to reach our team.`,
     };
   }
 

@@ -137,7 +137,7 @@ export default function SettingsPage() {
         <section className="rounded-2xl border border-gray-200 bg-white p-8">
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Notifications</h2>
           <p className="text-sm text-gray-600 mb-6">
-            Control whether we email you when there is new activity in your inbox threads.
+            Control whether we email you when someone sends a message on one of your project threads.
           </p>
           {notifyError && (
             <p className="mb-4 text-sm text-red-600" role="alert">
@@ -153,7 +153,7 @@ export default function SettingsPage() {
               onChange={(e) => void updateNotifyInbox(e.target.checked)}
             />
             <span>
-              <span className="block text-sm font-medium text-gray-900">New inbox message emails</span>
+              <span className="block text-sm font-medium text-gray-900">New project message emails</span>
               <span className="mt-1 block text-sm text-gray-600">
                 When on, we send a short email when someone messages you on a project thread.
               </span>

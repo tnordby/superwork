@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Inbox, Briefcase, ClipboardList } from 'lucide-react';
+import { Briefcase, ClipboardList } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { resolvePlatformRole } from '@/lib/auth/resolve-platform-role';
 import { isInternalStaff, isQuoteManager } from '@/lib/auth/platform-role';
@@ -51,15 +51,6 @@ export default async function TeamHomePage() {
       )}
 
       <ul className="mt-8 grid max-w-lg gap-3">
-        <li>
-          <Link
-            href="/inbox"
-            className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-900 transition-colors hover:border-gray-300"
-          >
-            <Inbox className="h-5 w-5 text-gray-600" />
-            Inbox
-          </Link>
-        </li>
         <li>
           <Link
             href="/projects/active"

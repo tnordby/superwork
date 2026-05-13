@@ -7,7 +7,10 @@ import {
   boosterMaxEur,
   boosterMinEur,
   boosterMultiplierLabel,
+  commitmentPeriodChargeEur,
+  commitmentSavingsVsGrossEur,
   hoursFromBudgetEur,
+  monthlyBudgetFromStripeRecurringUnitAmount,
   subscriptionMonthlyFromSliderIndex,
   subscriptionSliderIndexCount,
 } from './capacity-pricing';
@@ -33,6 +36,29 @@ describe('capacity-pricing', () => {
 
   it('annual prepay savings is 8% of gross annual', () => {
     expect(annualPrepaySavingsEur(4000)).toBeCloseTo(4000 * 12 * 0.08, 1);
+  });
+
+  it('commitment period charges apply discounts for quarterly, bi-annual, annual', () => {
+    expect(commitmentPeriodChargeEur(4000, 'monthly')).toBe(4000);
+    expect(commitmentPeriodChargeEur(4000, 'quarterly')).toBeCloseTo(4000 * 3 * 0.98, 1);
+    expect(commitmentPeriodChargeEur(4000, 'biannual')).toBeCloseTo(4000 * 6 * 0.95, 1);
+    expect(commitmentPeriodChargeEur(4000, 'annual')).toBeCloseTo(4000 * 12 * 0.92, 1);
+  });
+
+  it('commitment savings vs gross is zero for monthly', () => {
+    expect(commitmentSavingsVsGrossEur(8000, 'monthly')).toBe(0);
+    expect(commitmentSavingsVsGrossEur(8000, 'annual')).toBeGreaterThan(0);
+  });
+
+  it('reconstructs monthly budget from Stripe recurring unit amount', () => {
+    const monthly = 10_000;
+    expect(
+      monthlyBudgetFromStripeRecurringUnitAmount(Math.round(monthly * 100), 'month', 1)
+    ).toBe(monthly);
+    const annualCents = Math.round(monthly * 12 * (1 - 0.08) * 100);
+    expect(monthlyBudgetFromStripeRecurringUnitAmount(annualCents, 'year', 1)).toBeCloseTo(monthly, 1);
+    const qCents = Math.round(monthly * 3 * (1 - 0.02) * 100);
+    expect(monthlyBudgetFromStripeRecurringUnitAmount(qCents, 'month', 3)).toBeCloseTo(monthly, 1);
   });
 
   it('booster min is €3k when monthly allows; max still 5× capped at €50k', () => {

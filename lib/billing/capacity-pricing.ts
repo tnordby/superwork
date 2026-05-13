@@ -10,6 +10,123 @@ export const SUBSCRIPTION_STEP_EUR = 500;
 
 export const ANNUAL_PREPAY_DISCOUNT = 0.08;
 
+/** Longer commitments than monthly: applied to the gross amount for that billing period (EUR). */
+export const QUARTERLY_COMMITMENT_DISCOUNT = 0.02;
+export const BIANNUAL_COMMITMENT_DISCOUNT = 0.05;
+
+export const CAPACITY_BILLING_PERIODS = ['monthly', 'quarterly', 'biannual', 'annual'] as const;
+export type CapacityBillingPeriod = (typeof CAPACITY_BILLING_PERIODS)[number];
+
+export function parseCapacityBillingPeriod(raw: unknown): CapacityBillingPeriod | null {
+  if (raw === 'monthly' || raw === 'quarterly' || raw === 'biannual' || raw === 'annual') {
+    return raw;
+  }
+  return null;
+}
+
+export function commitmentDiscountForPeriod(period: CapacityBillingPeriod): number {
+  switch (period) {
+    case 'monthly':
+      return 0;
+    case 'quarterly':
+      return QUARTERLY_COMMITMENT_DISCOUNT;
+    case 'biannual':
+      return BIANNUAL_COMMITMENT_DISCOUNT;
+    case 'annual':
+      return ANNUAL_PREPAY_DISCOUNT;
+    default: {
+      const _exhaustive: never = period;
+      return _exhaustive;
+    }
+  }
+}
+
+/** Maps Stripe `Price.recurring` to our portal billing period (null if unsupported). */
+export function capacityBillingPeriodFromStripeRecurring(
+  interval: string | undefined,
+  intervalCount: number | undefined
+): CapacityBillingPeriod | null {
+  const count = intervalCount ?? 1;
+  if (interval === 'year' && count === 1) return 'annual';
+  if (interval === 'month') {
+    if (count === 1) return 'monthly';
+    if (count === 3) return 'quarterly';
+    if (count === 6) return 'biannual';
+  }
+  return null;
+}
+
+export function stripeRecurringForCapacityPeriod(period: CapacityBillingPeriod): {
+  interval: 'month' | 'year';
+  interval_count: number;
+} {
+  switch (period) {
+    case 'monthly':
+      return { interval: 'month', interval_count: 1 };
+    case 'quarterly':
+      return { interval: 'month', interval_count: 3 };
+    case 'biannual':
+      return { interval: 'month', interval_count: 6 };
+    case 'annual':
+      return { interval: 'year', interval_count: 1 };
+    default: {
+      const _exhaustive: never = period;
+      return _exhaustive;
+    }
+  }
+}
+
+const COMMITMENT_MONTHS: Record<CapacityBillingPeriod, number> = {
+  monthly: 1,
+  quarterly: 3,
+  biannual: 6,
+  annual: 12,
+};
+
+/** One Stripe invoice amount (EUR) for the selected commitment (after period discount). */
+export function commitmentPeriodChargeEur(monthlyEur: number, period: CapacityBillingPeriod): number {
+  assertValidSubscriptionMonthly(monthlyEur);
+  const months = COMMITMENT_MONTHS[period];
+  const d = commitmentDiscountForPeriod(period);
+  const raw = monthlyEur * months * (1 - d);
+  return Math.round(raw * 100) / 100;
+}
+
+export function commitmentPeriodChargeCents(monthlyEur: number, period: CapacityBillingPeriod): number {
+  return Math.round(commitmentPeriodChargeEur(monthlyEur, period) * 100);
+}
+
+/** Gross (no discount) for the same covered months — for “you save” UI. */
+export function commitmentGrossEur(monthlyEur: number, period: CapacityBillingPeriod): number {
+  assertValidSubscriptionMonthly(monthlyEur);
+  const months = COMMITMENT_MONTHS[period];
+  return Math.round(monthlyEur * months * 100) / 100;
+}
+
+export function commitmentSavingsVsGrossEur(monthlyEur: number, period: CapacityBillingPeriod): number {
+  const gross = commitmentGrossEur(monthlyEur, period);
+  const charged = commitmentPeriodChargeEur(monthlyEur, period);
+  return Math.round((gross - charged) * 100) / 100;
+}
+
+/**
+ * Reverse-engineers the portal monthly budget (EUR) from a Stripe recurring unit amount (cents).
+ * Used when `workspace_plan_terms` is missing but Stripe subscription exists.
+ */
+export function monthlyBudgetFromStripeRecurringUnitAmount(
+  unitAmountCents: number,
+  interval: string | undefined,
+  intervalCount: number | undefined
+): number | null {
+  const period = capacityBillingPeriodFromStripeRecurring(interval, intervalCount);
+  if (!period) return null;
+  const major = unitAmountCents / 100;
+  const months = COMMITMENT_MONTHS[period];
+  const d = commitmentDiscountForPeriod(period);
+  if (months === 1) return Math.round(major * 100) / 100;
+  return Math.round((major / (months * (1 - d))) * 100) / 100;
+}
+
 export const BOOSTER_GLOBAL_MAX_EUR = 50_000;
 export const BOOSTER_MULTIPLIER_MAX = 5;
 /** Minimum Booster checkout (EUR); may be lowered when 5× monthly is below this. */

@@ -7,12 +7,18 @@ import {
 } from '@/lib/account/customer-workspace-context';
 import {
   assertValidSubscriptionMonthly,
-  annualAmountEur,
+  commitmentPeriodChargeCents,
+  parseCapacityBillingPeriod,
+  stripeRecurringForCapacityPeriod,
+  type CapacityBillingPeriod,
 } from '@/lib/billing/capacity-pricing';
 
 type CapacityCheckoutBody = {
   monthlyBudgetEur: number;
-  annualPrepay: boolean;
+  /** Preferred: monthly | quarterly | biannual | annual */
+  billingPeriod?: CapacityBillingPeriod;
+  /** @deprecated Use billingPeriod: 'annual' */
+  annualPrepay?: boolean;
 };
 
 export async function POST(request: NextRequest) {
@@ -106,37 +112,29 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const { monthlyBudgetEur, annualPrepay } = body.capacityCheckout;
+      const { monthlyBudgetEur, billingPeriod: billingPeriodRaw, annualPrepay } = body.capacityCheckout;
       try {
         assertValidSubscriptionMonthly(monthlyBudgetEur);
       } catch {
         return NextResponse.json({ error: 'Invalid subscription amount' }, { status: 400 });
       }
 
-      const annualPrepayBool = Boolean(annualPrepay);
+      const billingPeriod: CapacityBillingPeriod =
+        parseCapacityBillingPeriod(billingPeriodRaw) ?? (annualPrepay === true ? 'annual' : 'monthly');
+
       const committedFloor = monthlyBudgetEur;
       const capacityMeta = {
         ...sharedMeta,
         checkout_kind: 'capacity_subscription',
         monthly_budget_eur: String(monthlyBudgetEur),
-        annual_prepay: annualPrepayBool ? 'true' : 'false',
+        billing_period: billingPeriod,
+        annual_prepay: billingPeriod === 'annual' ? 'true' : 'false',
         committed_monthly_floor_eur: String(committedFloor),
         pricing_model: 'slider_v1',
       };
 
-      const recurring = annualPrepayBool
-        ? {
-            interval: 'year' as const,
-            interval_count: 1,
-          }
-        : {
-            interval: 'month' as const,
-            interval_count: 1,
-          };
-
-      const unitAmountCents = annualPrepayBool
-        ? Math.round(annualAmountEur(monthlyBudgetEur, true) * 100)
-        : Math.round(monthlyBudgetEur * 100);
+      const recurring = stripeRecurringForCapacityPeriod(billingPeriod);
+      const unitAmountCents = commitmentPeriodChargeCents(monthlyBudgetEur, billingPeriod);
 
       const session = await stripe.checkout.sessions.create({
         customer: customerId,

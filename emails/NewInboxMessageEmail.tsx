@@ -16,7 +16,7 @@ interface NewInboxMessageEmailProps {
   projectName: string;
   senderName: string;
   preview: string;
-  inboxUrl: string;
+  projectUrl: string;
 }
 
 export default function NewInboxMessageEmail({
@@ -24,7 +24,7 @@ export default function NewInboxMessageEmail({
   projectName,
   senderName,
   preview,
-  inboxUrl,
+  projectUrl,
 }: NewInboxMessageEmailProps) {
   return (
     <Html>
@@ -41,8 +41,8 @@ export default function NewInboxMessageEmail({
             <Text style={quoteText}>{preview}</Text>
           </Section>
           <Section style={buttonSection}>
-            <Link href={inboxUrl} style={button}>
-              Open inbox
+            <Link href={projectUrl} style={button}>
+              View project
             </Link>
           </Section>
           <Text style={footer}>You are receiving this because you are on the thread in Superwork.</Text>

@@ -24,7 +24,6 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
-  Inbox,
   Grid3x3,
   FolderKanban,
   Shield,
@@ -177,7 +176,6 @@ export function Sidebar() {
         { label: 'Home', href: '/', icon: Home },
         ...(isAdminRole(effectiveRole) ? [{ label: 'Admin', href: '/admin', icon: Shield }] : []),
         projectsSection,
-        { label: 'Inbox', href: '/inbox', icon: Inbox },
         planSection,
         customerAccountSection,
         { label: 'Assets', href: '/assets', icon: Folder },
@@ -187,7 +185,6 @@ export function Sidebar() {
 
     const items: (NavItem | ExpandableNavItem)[] = [
       { label: 'Team home', href: '/team', icon: Home },
-      { label: 'Inbox', href: '/inbox', icon: Inbox },
       projectsSection,
     ];
 

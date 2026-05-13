@@ -1,6 +1,9 @@
 /**
  * Personal / webmail domains we reject for self-service signup to reduce bot noise
  * and protect transactional email reputation. Invites and admin flows are separate.
+ *
+ * Database enforcement: keep in sync with
+ * `supabase/migrations/054_enforce_work_email_on_auth_user_insert.sql` (blocked list + trigger).
  */
 const BLOCKED_SIGNUP_EMAIL_DOMAINS = new Set([
   'gmail.com',

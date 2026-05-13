@@ -10,6 +10,20 @@ import Stripe from 'stripe';
 export * from './utils';
 
 /**
+ * End of the current billing period from Stripe. Uses the latest period end across
+ * subscription items so multi-item subscriptions stay correct.
+ */
+export function currentPeriodEndIsoFromSubscription(
+  subscription: Stripe.Subscription
+): string | null {
+  const ends = subscription.items.data
+    .map((item) => item.current_period_end)
+    .filter((t): t is number => typeof t === 'number');
+  if (ends.length === 0) return null;
+  return new Date(Math.max(...ends) * 1000).toISOString();
+}
+
+/**
  * Get all available subscription plans from Stripe
  */
 export async function getSubscriptionPlans() {

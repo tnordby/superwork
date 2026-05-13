@@ -40,13 +40,9 @@ export default function BillingPage() {
     setLoading(true);
     try {
       const workspaceId = localStorage.getItem('currentWorkspaceId');
+      const query = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
 
-      if (!workspaceId) {
-        router.push('/');
-        return;
-      }
-
-      const response = await fetch(`/api/billing/workspace?workspaceId=${workspaceId}`, {
+      const response = await fetch(`/api/billing/workspace${query}`, {
         credentials: 'include',
       });
       const data = await response.json().catch(() => null);
@@ -57,6 +53,9 @@ export default function BillingPage() {
 
       setWorkspace(data.workspace);
       setInvoices(data.invoices || []);
+      if (data.workspace?.id) {
+        localStorage.setItem('currentWorkspaceId', data.workspace.id);
+      }
     } catch (error) {
       console.error('Error fetching billing data:', error);
       setWorkspace(null);

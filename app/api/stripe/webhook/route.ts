@@ -10,16 +10,22 @@ import {
   upsertWorkspacePlanTermsFromSubscriptionCheckout,
 } from '@/lib/stripe/checkout-workspace-sync';
 import { hoursFromBudgetEur } from '@/lib/billing/capacity-pricing';
+import { currentPeriodEndIsoFromSubscription } from '@/lib/stripe/helpers';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
-function getCurrentPeriodEndIso(subscription: unknown): string | null {
-  if (!subscription || typeof subscription !== 'object') return null;
-  const s = subscription as {
-    items?: { data?: Array<{ current_period_end?: number }> };
-  };
-  const raw = s.items?.data?.[0]?.current_period_end;
-  if (typeof raw !== 'number') return null;
-  return new Date(raw * 1000).toISOString();
+async function resolveWorkspaceIdForSubscription(
+  admin: SupabaseClient,
+  subscription: Stripe.Subscription
+): Promise<string | null> {
+  const fromMeta = subscription.metadata?.workspace_id;
+  if (typeof fromMeta === 'string' && fromMeta.length > 0) return fromMeta;
+  const { data } = await admin
+    .from('workspaces')
+    .select('id')
+    .eq('stripe_subscription_id', subscription.id)
+    .maybeSingle();
+  return data?.id ?? null;
 }
 
 function getInvoiceSubscriptionId(invoice: unknown): string | null {
@@ -80,7 +86,7 @@ export async function POST(request: NextRequest) {
               stripe_subscription_status: subscription.status,
               stripe_price_id: price?.id,
               subscription_interval: interval,
-              current_period_end: getCurrentPeriodEndIso(subscription),
+              current_period_end: currentPeriodEndIsoFromSubscription(subscription),
             })
             .eq('id', workspaceId);
 
@@ -114,7 +120,7 @@ export async function POST(request: NextRequest) {
                   amount: formatAmount(price.unit_amount || 0, price.currency || 'usd'),
                   billingInterval: interval,
                   nextBillingDate: new Date(
-                    getCurrentPeriodEndIso(subscription) ?? new Date().toISOString()
+                    currentPeriodEndIsoFromSubscription(subscription) ?? new Date().toISOString()
                   ).toLocaleDateString('en-US', {
                     month: 'long',
                     day: 'numeric',
@@ -144,14 +150,14 @@ export async function POST(request: NextRequest) {
 
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-          const workspaceId = subscription.metadata?.workspace_id;
+          const workspaceId = await resolveWorkspaceIdForSubscription(admin, subscription);
 
           if (workspaceId) {
             await admin
               .from('workspaces')
               .update({
                 stripe_subscription_status: 'active',
-                current_period_end: getCurrentPeriodEndIso(subscription),
+                current_period_end: currentPeriodEndIsoFromSubscription(subscription),
               })
               .eq('id', workspaceId);
 
@@ -167,7 +173,7 @@ export async function POST(request: NextRequest) {
 
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-          const workspaceId = subscription.metadata?.workspace_id;
+          const workspaceId = await resolveWorkspaceIdForSubscription(admin, subscription);
 
           if (workspaceId) {
             await admin
@@ -230,7 +236,7 @@ export async function POST(request: NextRequest) {
 
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
-        const workspaceId = subscription.metadata?.workspace_id;
+        const workspaceId = await resolveWorkspaceIdForSubscription(admin, subscription);
 
         if (workspaceId) {
           await admin
@@ -239,7 +245,7 @@ export async function POST(request: NextRequest) {
               stripe_subscription_status: subscription.status,
               stripe_price_id: subscription.items.data[0]?.price.id,
               subscription_interval: getIntervalFromPrice(subscription.items.data[0]?.price),
-              current_period_end: getCurrentPeriodEndIso(subscription),
+              current_period_end: currentPeriodEndIsoFromSubscription(subscription),
             })
             .eq('id', workspaceId);
 
@@ -264,7 +270,7 @@ export async function POST(request: NextRequest) {
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
-        const workspaceId = subscription.metadata?.workspace_id;
+        const workspaceId = await resolveWorkspaceIdForSubscription(admin, subscription);
 
         if (workspaceId) {
           await admin

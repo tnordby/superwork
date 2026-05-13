@@ -1,0 +1,588 @@
+'use client';
+
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Paperclip, MoreVertical } from 'lucide-react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
+import { useSidebar } from '@/components/SidebarContext';
+import { DEFAULT_TEAM_CONTACT_NAME } from '@/lib/messaging/constants';
+import type { ConversationSummary, MessageRow, ConversationOption } from '@/types/messaging';
+
+function formatTimestamp(value: string | null | undefined): string {
+  if (!value) return '';
+  const date = new Date(value);
+  return date.toLocaleString();
+}
+
+export default function InboxPage() {
+  return (
+    <Suspense fallback={<InboxLoadingFallback />}>
+      <InboxPageContent />
+    </Suspense>
+  );
+}
+
+function InboxShell({ children }: { children: ReactNode }) {
+  const { isCollapsed } = useSidebar();
+  const leftOffset = isCollapsed ? 'left-20' : 'left-64';
+  return (
+    <div
+      className={`fixed inset-0 top-16 bg-gray-50 transition-all duration-300 ${leftOffset}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function InboxPageContent() {
+  const { user, loading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get('projectId');
+  const consultantName = searchParams.get('consultantName');
+
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [messages, setMessages] = useState<MessageRow[]>([]);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [messageInput, setMessageInput] = useState('');
+
+  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [creatingConversation, setCreatingConversation] = useState(false);
+  const [options, setOptions] = useState<ConversationOption[]>([]);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [reloadConversationsToken, setReloadConversationsToken] = useState(0);
+  const [selectedProjectForNew, setSelectedProjectForNew] = useState<string>('');
+  const [selectedContactForNew, setSelectedContactForNew] = useState<string>('');
+  const [extraParticipantsInput, setExtraParticipantsInput] = useState('');
+  const [showExtraParticipants, setShowExtraParticipants] = useState(false);
+  const [viewingClientName, setViewingClientName] = useState<string | null>(null);
+
+  const selectedConv = useMemo(() => {
+    if (!selectedConversationId) return null;
+    return conversations.find((c) => c.id === selectedConversationId) ?? null;
+  }, [conversations, selectedConversationId]);
+
+  const selectedProjectContacts = useMemo(
+    () => options.find((option) => option.projectId === selectedProjectForNew)?.contacts ?? [],
+    [options, selectedProjectForNew]
+  );
+
+  const draftParticipants = useMemo(() => {
+    const parsed = extraParticipantsInput
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean);
+    return Array.from(new Set([selectedContactForNew, ...parsed].filter(Boolean)));
+  }, [selectedContactForNew, extraParticipantsInput]);
+
+  const getConversationLabel = (conversation: ConversationSummary): string => {
+    const participants = conversation.participant_names?.filter(Boolean) ?? [];
+    if (participants.length === 0) return conversation.consultant_name;
+    if (participants.length === 1) return participants[0];
+    return `${participants[0]} +${participants.length - 1}`;
+  };
+
+  useEffect(() => {
+    async function loadContext() {
+      if (authLoading || !user) return;
+      try {
+        const response = await fetch('/api/internal/selected-workspace', { credentials: 'include' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (typeof data.workspace_name === 'string' && data.workspace_name) {
+          setViewingClientName(data.workspace_name);
+        }
+      } catch {
+        // no-op
+      }
+    }
+    void loadContext();
+  }, [authLoading, user]);
+
+  useEffect(() => {
+    async function loadOptions() {
+      if (authLoading || !user) return;
+      setOptionsError(null);
+      try {
+        const res = await fetch('/api/conversations/options');
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error || 'Failed to load options');
+        const loaded: ConversationOption[] = data?.options ?? [];
+        setOptions(loaded);
+      } catch (e) {
+        console.error(e);
+        const message =
+          e instanceof Error ? e.message : 'Unable to load conversation setup options.';
+        setOptionsError(message);
+        setOptions([]);
+      }
+    }
+
+    void loadOptions();
+  }, [authLoading, user]);
+
+  useEffect(() => {
+    async function loadConversations() {
+      if (authLoading || !user) return;
+
+      setError(null);
+      setLoadingConversations(true);
+
+      try {
+        const qs = new URLSearchParams();
+        if (projectId) qs.set('projectId', projectId);
+
+        const res = await fetch(`/api/conversations?${qs.toString()}`);
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || 'Failed to load conversations');
+        }
+
+        const data = await res.json();
+        let list: ConversationSummary[] = data.conversations ?? [];
+
+        // If we arrived here from a project context and there is no thread yet,
+        // create the conversation so the user can immediately send a message.
+        const consultantForCreate = consultantName?.trim() || DEFAULT_TEAM_CONTACT_NAME;
+        if (list.length === 0 && projectId) {
+          const createRes = await fetch('/api/conversations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId, consultantName: consultantForCreate }),
+          });
+
+          if (createRes.ok) {
+            const createdData = await createRes.json();
+            const created: ConversationSummary | null = createdData.conversation ?? null;
+            if (created) list = [created];
+          } else {
+            const errData = await createRes.json().catch(() => null);
+            if (errData?.error && typeof errData.error === 'string') {
+              setError(errData.error);
+            }
+          }
+        }
+
+        setConversations(list);
+        setSelectedConversationId((prev) => {
+          if (prev && list.some((c) => c.id === prev)) return prev;
+          return list[0]?.id ?? null;
+        });
+      } catch (e) {
+        console.error(e);
+        setError(e instanceof Error ? e.message : 'Unable to load inbox conversations.');
+      } finally {
+        setLoadingConversations(false);
+      }
+    }
+
+    void loadConversations();
+  }, [authLoading, user, projectId, consultantName, reloadConversationsToken]);
+
+  useEffect(() => {
+    setExtraParticipantsInput('');
+    setShowExtraParticipants(false);
+    if (!selectedProjectForNew) {
+      setSelectedContactForNew('');
+      return;
+    }
+
+    const project = options.find((option) => option.projectId === selectedProjectForNew);
+    if (!project || project.contacts.length === 0) {
+      setSelectedContactForNew('');
+      return;
+    }
+
+    setSelectedContactForNew(project.contacts[0].name);
+  }, [selectedProjectForNew, options]);
+
+  useEffect(() => {
+    async function loadMessages() {
+      if (!selectedConversationId || authLoading || !user) return;
+
+      setError(null);
+      setLoadingMessages(true);
+      try {
+        const res = await fetch(`/api/conversations/${selectedConversationId}/messages`);
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || 'Failed to load messages');
+        }
+
+        const data = await res.json();
+        const list: MessageRow[] = data.messages ?? [];
+        setMessages(list);
+      } catch (e) {
+        console.error(e);
+        setError(e instanceof Error ? e.message : 'Unable to load messages for this conversation.');
+      } finally {
+        setLoadingMessages(false);
+      }
+    }
+
+    loadMessages();
+  }, [selectedConversationId, authLoading, user]);
+
+  const sendMessage = async (content: string) => {
+    if (authLoading || !user) return;
+    if (!selectedConversationId) return;
+
+    const trimmed = content.trim();
+    if (!trimmed) return;
+
+    setError(null);
+    setSending(true);
+
+    try {
+      const res = await fetch(`/api/conversations/${selectedConversationId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: trimmed }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || 'Failed to send message');
+      }
+
+      const data = await res.json();
+      const created: MessageRow | null = data.message ?? null;
+      if (created) setMessages((prev) => [...prev, created]);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : 'Unable to send message.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!messageInput.trim()) return;
+    const content = messageInput;
+    setMessageInput('');
+    await sendMessage(content);
+  };
+
+  const handleCreateConversation = async () => {
+    if (!selectedProjectForNew || !selectedContactForNew) return;
+
+    setCreatingConversation(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: selectedProjectForNew,
+          consultantName: selectedContactForNew,
+          participantNames: draftParticipants,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to create conversation');
+      }
+
+      const created: ConversationSummary | null = data?.conversation ?? null;
+      if (created) {
+        setConversations((prev) => {
+          const without = prev.filter((conversation) => conversation.id !== created.id);
+          return [created, ...without];
+        });
+        setSelectedConversationId(created.id);
+        setExtraParticipantsInput('');
+      }
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : 'Unable to start a new conversation.');
+    } finally {
+      setCreatingConversation(false);
+    }
+  };
+
+  const contextError =
+    error?.includes('client context') ||
+    error?.includes('outside selected client context') ||
+    optionsError?.includes('client context');
+
+  return (
+    <InboxShell>
+      <div className="h-full flex">
+        {/* Left sidebar - Conversations list */}
+        <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
+          <div className="p-6 border-b border-gray-200">
+            <h1 className="text-2xl font-semibold text-gray-900">Inbox</h1>
+            {viewingClientName && (
+              <div className="mt-2 inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
+                Viewing: {viewingClientName}
+              </div>
+            )}
+
+            <div className="mt-4 rounded-2xl border border-gray-200 p-4">
+              <p className="text-sm font-semibold text-gray-900">Start a conversation</p>
+              <p className="mt-1 text-xs text-gray-600">
+                Pick a project, then a contact. If no one is assigned yet, choose {DEFAULT_TEAM_CONTACT_NAME}.
+              </p>
+              {optionsError && (
+                <p className="mt-2 text-xs text-red-700">{optionsError}</p>
+              )}
+
+              <label className="mt-4 mb-1 block text-xs font-medium text-gray-700">Project</label>
+              <select
+                value={selectedProjectForNew}
+                onChange={(e) => setSelectedProjectForNew(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white py-2.5 px-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              >
+                <option value="">Select project</option>
+                {options.map((option) => (
+                  <option key={option.projectId} value={option.projectId}>
+                    {option.projectName}
+                  </option>
+                ))}
+              </select>
+
+              <label className="mt-3 mb-1 block text-xs font-medium text-gray-700">Contact</label>
+              <select
+                value={selectedContactForNew}
+                onChange={(e) => setSelectedContactForNew(e.target.value)}
+                disabled={!selectedProjectForNew}
+                className="w-full rounded-xl border border-gray-200 bg-white py-2.5 px-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-60"
+              >
+                <option value="">Select contact</option>
+                {selectedProjectContacts.map((contact) => (
+                  <option key={`${selectedProjectForNew}:${contact.name}`} value={contact.name}>
+                    {contact.name}
+                  </option>
+                ))}
+              </select>
+
+              {selectedProjectForNew && (
+                <button
+                  type="button"
+                  onClick={() => setShowExtraParticipants((value) => !value)}
+                  className="mt-3 text-xs font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900"
+                >
+                  {showExtraParticipants ? 'Hide extra participants' : 'Add extra participants (optional)'}
+                </button>
+              )}
+
+              {showExtraParticipants && (
+                <input
+                  value={extraParticipantsInput}
+                  onChange={(e) => setExtraParticipantsInput(e.target.value)}
+                  placeholder="Comma-separated names"
+                  className="mt-2 w-full rounded-xl border border-gray-200 bg-white py-2.5 px-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                />
+              )}
+
+              <button
+                onClick={() => void handleCreateConversation()}
+                disabled={!selectedProjectForNew || !selectedContactForNew || creatingConversation}
+                className="mt-4 w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-60"
+              >
+                {creatingConversation ? 'Starting…' : 'New message'}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {error && (
+              <div className="p-4 text-sm text-red-700 border-b border-red-100 bg-red-50">
+                {error}
+                {contextError ? (
+                  <p className="mt-2 text-xs text-red-800">
+                    <Link href="/team" className="underline underline-offset-2 font-medium">
+                      Open team workspace
+                    </Link>{' '}
+                    and choose a client, then retry.
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setReloadConversationsToken((value) => value + 1)}
+                  className="mt-3 inline-flex rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100/40"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {loadingConversations ? (
+              <div className="p-6 space-y-3">
+                <div className="h-4 w-40 animate-pulse rounded bg-gray-200" />
+                <div className="h-16 animate-pulse rounded-xl bg-gray-100" />
+                <div className="h-16 animate-pulse rounded-xl bg-gray-100" />
+              </div>
+            ) : conversations.length === 0 ? (
+              <div className="p-6 text-sm text-gray-600">
+                <p className="font-medium text-gray-900">No conversations yet</p>
+                <p className="mt-2 text-gray-600">
+                  Start one with the form above, or open a project and choose &quot;Open messages&quot;.
+                </p>
+              </div>
+            ) : (
+              conversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  onClick={() => setSelectedConversationId(conversation.id)}
+                  className={`w-full p-4 border-b border-gray-100 text-left transition-colors hover:bg-gray-50 ${
+                    selectedConversationId === conversation.id ? 'bg-gray-50' : ''
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#bfe937]">
+                      <span className="text-sm font-semibold text-gray-900">
+                        {conversation.consultant_initials}
+                      </span>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="text-sm font-semibold text-gray-900 truncate">
+                          {conversation.project_name ?? 'Project'}
+                        </h3>
+                        <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                          {formatTimestamp(conversation.last_message_at)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-1">{getConversationLabel(conversation)}</p>
+                      <p className="text-sm truncate text-gray-700">
+                        {conversation.last_message ?? 'No messages yet'}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Right side - Chat interface */}
+        <div className="flex-1 flex flex-col bg-white">
+          {selectedConv ? (
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#bfe937]">
+                  <span className="text-sm font-semibold text-gray-900">{selectedConv.consultant_initials}</span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">{selectedConv.project_name ?? 'Project'}</h2>
+                  <p className="text-sm text-gray-600">{getConversationLabel(selectedConv)}</p>
+                </div>
+              </div>
+              <button className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-50">
+                <MoreVertical className="h-5 w-5" />
+              </button>
+            </div>
+          ) : (
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {draftParticipants.length > 0
+                  ? `New conversation with ${draftParticipants.join(', ')}`
+                  : 'Select a conversation'}
+              </h2>
+              {draftParticipants.length === 0 && (
+                <p className="mt-1 text-sm text-gray-600">
+                  Use the left panel to start a new conversation.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {loadingMessages ? (
+              <div className="space-y-3">
+                <div className="h-4 w-48 animate-pulse rounded bg-gray-100" />
+                <div className="h-12 w-2/3 animate-pulse rounded-2xl bg-gray-100" />
+                <div className="h-12 w-1/2 animate-pulse rounded-2xl bg-gray-100 ml-auto" />
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-8 text-center text-sm text-gray-600">
+                <p className="font-medium text-gray-900">No messages in this thread yet</p>
+                <p className="mt-2">Send a note below to get the conversation started.</p>
+              </div>
+            ) : (
+              messages.map((message) => {
+                const isYou = user?.id && message.sender_id === user.id;
+                const isPing = message.content.trim().toLowerCase() === '🔔 ping';
+                return (
+                  <div key={message.id} className={`flex ${isYou ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[70%] ${isYou ? 'order-2' : ''}`}>
+                      {!isYou && <p className="text-xs font-medium text-gray-900 mb-1">{message.sender_name}</p>}
+                      <div
+                        className={`rounded-2xl px-4 py-3 ${
+                          isYou ? 'bg-[#bfe937] text-gray-900' : 'bg-gray-100 text-gray-900'
+                        }`}
+                      >
+                        {isPing ? (
+                          <p className="text-sm font-semibold whitespace-pre-wrap">{message.content}</p>
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">{formatTimestamp(message.created_at)}</p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Message input */}
+          <div className="p-6 border-t border-gray-200">
+            <div className="flex items-center gap-3">
+              <button
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-50"
+                disabled
+                aria-label="Attach file"
+              >
+                <Paperclip className="h-5 w-5" />
+              </button>
+
+              <div className="flex-1">
+                <textarea
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleSendMessage();
+                    }
+                  }}
+                  placeholder="Type your message..."
+                  rows={1}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm resize-none focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                />
+              </div>
+
+              <button
+                onClick={() => void handleSendMessage()}
+                disabled={!selectedConversationId || sending}
+                className="flex h-10 min-w-[88px] items-center justify-center rounded-xl bg-[#bfe937] px-4 text-sm font-medium text-gray-900 transition-colors hover:bg-[#acd829] disabled:opacity-60"
+                aria-label="Send message"
+              >
+                <span>Send</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </InboxShell>
+  );
+}
+
+function InboxLoadingFallback() {
+  return (
+    <InboxShell>
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-gray-600">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" aria-hidden />
+        <span>Loading inbox…</span>
+      </div>
+    </InboxShell>
+  );
+}
+

@@ -107,14 +107,6 @@ function toneClasses(tone: 'blue' | 'green' | 'purple'): string {
   return 'bg-blue-100 text-blue-600';
 }
 
-function dashboardProjectInboxHref(project: Pick<DashboardProjectRow, 'id' | 'assignee'>): string {
-  const p = new URLSearchParams({ projectId: project.id });
-  if (project.assignee) {
-    p.set('consultantName', project.assignee);
-  }
-  return `/inbox?${p.toString()}`;
-}
-
 async function loadDashboardData(): Promise<DashboardData> {
   const fallback: DashboardData = {
     activeProjects: [],
@@ -343,10 +335,10 @@ export default async function Home() {
                     />
                   </div>
                   <Link
-                    href={dashboardProjectInboxHref(project)}
+                    href={`/projects/${project.id}`}
                     className="mt-3 inline-block text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
                   >
-                    Open messages
+                    View project
                   </Link>
                 </div>
               ))}
