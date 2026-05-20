@@ -253,7 +253,12 @@ export function SignupPageClient({ initialOAuthErrorMessage }: SignupPageClientP
               Terms
             </Link>{' '}
             and{' '}
-            <Link href="/privacy" className="underline hover:text-gray-700">
+            <Link
+              href="https://www.superwork.co/privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-gray-700"
+            >
               Privacy Policy
             </Link>
             .
