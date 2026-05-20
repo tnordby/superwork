@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { isInternalStaff } from '@/lib/auth/platform-role';
+import { ProjectCreationGate } from '@/components/billing/ProjectCreationGate';
 
 export default function CustomBriefPage() {
   const router = useRouter();
@@ -188,7 +189,7 @@ ${formData.additionalContext || 'Not specified'}
           </p>
         </div>
 
-        {/* Form */}
+        <ProjectCreationGate>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Project Name */}
           <div>
@@ -462,6 +463,7 @@ ${formData.additionalContext || 'Not specified'}
             </li>
           </ul>
         </div>
+        </ProjectCreationGate>
       </div>
     </div>
   );

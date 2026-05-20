@@ -9,6 +9,10 @@ import {
   resolveInternalWriteWorkspaceId,
 } from '@/lib/internal/client-context';
 import { tryCreateServiceRoleClient } from '@/lib/supabase/admin';
+import {
+  getWorkspaceProjectCreationEligibility,
+  PROJECT_CREATION_BLOCKED_MESSAGE,
+} from '@/lib/billing/project-creation-eligibility';
 
 async function resolveCustomerWorkspaceIdWithRls(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data: ownedWorkspace, error: ownedError } = await supabase
@@ -224,6 +228,29 @@ export async function POST(request: NextRequest) {
     } else {
       customerWorkspaceId = ctx.workspace.id;
       customerProjectClient = ctx.admin;
+    }
+
+    const { data: workspaceBilling, error: billingError } = await customerProjectClient
+      .from('workspaces')
+      .select('stripe_subscription_status')
+      .eq('id', customerWorkspaceId)
+      .single();
+
+    if (billingError || !workspaceBilling) {
+      return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const eligibility = await getWorkspaceProjectCreationEligibility(
+      customerProjectClient,
+      customerWorkspaceId,
+      workspaceBilling.stripe_subscription_status
+    );
+
+    if (!eligibility.allowed) {
+      return NextResponse.json(
+        { error: PROJECT_CREATION_BLOCKED_MESSAGE, code: 'ACTIVE_PLAN_REQUIRED' },
+        { status: 403 }
+      );
     }
 
     const requestedTeamId = typeof team_id === 'string' && team_id.trim() ? team_id.trim() : null;

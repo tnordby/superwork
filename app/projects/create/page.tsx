@@ -8,6 +8,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { isInternalStaff } from '@/lib/auth/platform-role';
 import MarketingHubForm from './MarketingHubForm';
 import DynamicIntakeForm, { type IntakeResponseMap } from './DynamicIntakeForm';
+import { ProjectCreationGate } from '@/components/billing/ProjectCreationGate';
 
 interface ServiceTemplate {
   id: string;
@@ -548,6 +549,7 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
           </div>
         )}
 
+        <ProjectCreationGate>
         {(workspaceTeams.length > 0 ||
           (platformRole !== null &&
             isInternalStaff(platformRole) &&
@@ -595,6 +597,7 @@ ${data.additionalNotes ? `## Additional Notes\n${data.additionalNotes}` : ''}`;
 
           return isMarketingHub ? renderMarketingHubForm() : renderGenericForm();
         })()}
+        </ProjectCreationGate>
       </div>
     </div>
   );
