@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Check, CreditCard, Zap } from 'lucide-react';
+import { Calendar, Check, CreditCard, Lock, Sparkles, Zap } from 'lucide-react';
 import { formatAmount, formatBillingInterval, formatSubscriptionStatus } from '@/lib/stripe/utils';
 import { SubscriptionBanner } from '@/components/billing/SubscriptionBanner';
 import { StripeMark } from '@/components/billing/StripeMark';
@@ -11,6 +11,7 @@ import {
   SUBSCRIPTION_MONTHLY_MAX_EUR,
   SUBSCRIPTION_MONTHLY_MIN_EUR,
   SUBSCRIPTION_STEP_EUR,
+  commitmentDiscountForPeriod,
   commitmentGrossEur,
   commitmentPeriodChargeEur,
   commitmentSavingsVsGrossEur,
@@ -75,6 +76,12 @@ const SUBSCRIBE_BILLING_OPTIONS: {
   { id: 'biannual', label: 'Bi-annual', description: 'Billed every 6 months — 5% off' },
   { id: 'annual', label: 'Annual', description: 'Billed once per year — 8% off' },
 ];
+
+function billingPeriodSavingsLabel(period: CapacityBillingPeriod): string | null {
+  const discount = commitmentDiscountForPeriod(period);
+  if (discount <= 0) return null;
+  return `${Math.round(discount * 100)}% off`;
+}
 
 function clampSubscriptionIndexFromMonthly(monthly: number): number {
   const snapped =
@@ -291,7 +298,7 @@ export default function PlanPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900">Subscription & billing</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Subscription & billing</h1>
         {billingViaStripe && hasActiveSubscription ? (
           <p className="mt-2 text-sm leading-relaxed text-gray-600">
             Payments are processed securely through{' '}
@@ -628,97 +635,127 @@ export default function PlanPage() {
       ) : null}
 
       {!enterprise && !hasActiveSubscription ? (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-stretch lg:gap-10">
-          <div className="text-center lg:flex lg:max-w-xl lg:flex-col lg:justify-center lg:text-left">
-            <h2 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">
-              Pay for the capacity you need. Starting at €4,000/month.
-            </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm text-gray-600 lg:mx-0">
-              One subscription covers platform access and delivery capacity. Choose monthly billing or commit to
-              quarterly, bi-annual, or annual cycles with prepay savings.
-            </p>
+        <div className="space-y-6">
+          <div className="relative overflow-hidden rounded-3xl border border-gray-200/80 bg-gradient-to-br from-white via-gray-50/80 to-[#f4fce0]/60 px-6 py-8 sm:px-10 sm:py-10">
+            <div
+              className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#bfe937]/20 blur-3xl"
+              aria-hidden
+            />
+            <div className="relative max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-gray-200/80 bg-white/80 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm backdrop-blur-sm">
+                <Sparkles className="h-3.5 w-3.5 text-gray-700" aria-hidden />
+                Flexible capacity subscription
+              </div>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">
+                Pay for the capacity you need
+              </h2>
+              <p className="mt-3 max-w-2xl text-base leading-relaxed text-gray-600">
+                One subscription covers your client portal and delivery capacity. Start at{' '}
+                {formatEurMajor(SUBSCRIPTION_MONTHLY_MIN_EUR)}/month, then choose a billing cycle with prepay savings.
+              </p>
+            </div>
           </div>
 
-          <div className="flex min-h-0 flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8 lg:h-full lg:min-h-0">
-            <div className="grid min-h-0 flex-1 grid-cols-1 gap-8 xl:grid-cols-2 xl:items-stretch xl:gap-8">
-              <div className="flex min-h-0 flex-1 flex-col xl:h-full">
-                <div className="flex flex-col gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Monthly capacity (subscription basis)</p>
-                    <p className="text-4xl font-bold text-gray-900">{formatEurMajor(subscribeMonthly)}</p>
-                    <p className="mt-1 text-sm text-gray-500">
-                      €500 steps · up to {formatEurMajor(SUBSCRIPTION_MONTHLY_MAX_EUR)} in-app
-                    </p>
-                  </div>
-                  <fieldset className="space-y-2">
-                    <legend className="text-sm font-medium text-gray-800">Billing cycle</legend>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {SUBSCRIBE_BILLING_OPTIONS.map((opt) => (
+          <div className="overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-gray-100">
+            <div className="grid lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="border-b border-gray-100 p-6 sm:p-8 lg:border-b-0 lg:border-r">
+                <div className="rounded-2xl border border-gray-100 bg-gradient-to-b from-gray-50/80 to-white p-5 sm:p-6">
+                  <p className="text-sm font-medium text-gray-600">Monthly capacity</p>
+                  <p className="mt-1 tabular-nums text-5xl font-bold tracking-tight text-gray-900 sm:text-6xl">
+                    {formatEurMajor(subscribeMonthly)}
+                  </p>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Adjust in {formatEurMajor(SUBSCRIPTION_STEP_EUR)} steps · up to{' '}
+                    {formatEurMajor(SUBSCRIPTION_MONTHLY_MAX_EUR)}
+                  </p>
+                </div>
+
+                <fieldset className="mt-8">
+                  <legend className="text-sm font-semibold text-gray-900">Billing cycle</legend>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {SUBSCRIBE_BILLING_OPTIONS.map((opt) => {
+                      const selected = billingPeriod === opt.id;
+                      const savingsLabel = billingPeriodSavingsLabel(opt.id);
+                      return (
                         <label
                           key={opt.id}
-                          className={`flex cursor-pointer flex-col rounded-lg border p-3 text-left text-sm transition-colors ${
-                            billingPeriod === opt.id
-                              ? 'border-gray-900 bg-gray-50 ring-1 ring-gray-900'
-                              : 'border-gray-200 hover:border-gray-300'
+                          className={`relative flex cursor-pointer flex-col rounded-xl border p-4 text-left transition-all ${
+                            selected
+                              ? 'border-gray-900 bg-gray-900/[0.03] shadow-sm ring-2 ring-gray-900 ring-offset-2 ring-offset-white'
+                              : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
                           }`}
                         >
-                          <span className="flex items-start gap-2">
+                          <span className="sr-only">
                             <input
                               type="radio"
                               name="billing-period"
                               value={opt.id}
-                              checked={billingPeriod === opt.id}
+                              checked={selected}
                               onChange={() => setBillingPeriod(opt.id)}
-                              className="mt-0.5 h-4 w-4 border-gray-300 accent-gray-900"
                             />
-                            <span>
-                              <span className="font-semibold text-gray-900">{opt.label}</span>
-                              <span className="mt-0.5 block text-xs font-normal text-gray-600">{opt.description}</span>
-                            </span>
                           </span>
+                          <span className="flex items-start justify-between gap-2">
+                            <span className="font-semibold text-gray-900">{opt.label}</span>
+                            {savingsLabel ? (
+                              <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
+                                {savingsLabel}
+                              </span>
+                            ) : (
+                              <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                                Flexible
+                              </span>
+                            )}
+                          </span>
+                          <span className="mt-2 text-xs leading-relaxed text-gray-600">{opt.description}</span>
                         </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                </div>
+                      );
+                    })}
+                  </div>
+                </fieldset>
 
                 <div className="mt-8">
+                  <div className="mb-2 flex items-center justify-between text-xs font-medium text-gray-500">
+                    <span>Capacity</span>
+                    <span className="tabular-nums text-gray-900">{formatEurMajor(subscribeMonthly)}</span>
+                  </div>
                   <input
                     type="range"
                     min={0}
                     max={subscriptionSliderIndexCount() - 1}
                     value={subIdx}
                     onChange={(e) => setSubIdx(Number(e.target.value))}
-                    className="w-full accent-gray-900"
+                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-gray-900 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-gray-900 [&::-webkit-slider-thumb]:shadow-md"
                   />
-                  <div className="mt-3 flex flex-wrap justify-between gap-x-2 gap-y-1 text-xs text-gray-500">
+                  <div className="mt-4 grid grid-cols-4 gap-1 text-[11px] text-gray-500 sm:grid-cols-8">
                     {SUBSCRIPTION_ANCHOR_EUR.map((v) => (
-                      <span key={v}>{formatEurMajor(v)}</span>
+                      <span key={v} className="tabular-nums text-center sm:text-left">
+                        {formatEurMajor(v)}
+                      </span>
                     ))}
                   </div>
                 </div>
 
-                <div className="min-h-0 flex-1" aria-hidden />
-
-                <div className="mt-8 grid gap-4 rounded-xl bg-gray-50 p-6 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <div className="mt-8 grid gap-4 rounded-2xl border border-gray-100 bg-gray-50/80 p-5 sm:grid-cols-2 sm:p-6">
+                  <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
                       {billingPeriod === 'monthly' ? 'Each invoice' : 'Gross before discount'}
                     </p>
-                    <p className="text-2xl font-semibold text-gray-900">
+                    <p className="mt-1 tabular-nums text-2xl font-semibold text-gray-900">
                       {formatEurMajor(commitmentGrossEur(subscribeMonthly, billingPeriod))}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">You pay per cycle</p>
-                    <p className="text-2xl font-semibold text-gray-900">
+                  <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">You pay per cycle</p>
+                    <p className="mt-1 tabular-nums text-2xl font-semibold text-gray-900">
                       {formatEurMajor(commitmentPeriodChargeEur(subscribeMonthly, billingPeriod))}
                     </p>
                   </div>
                   {commitmentSavingsVsGrossEur(subscribeMonthly, billingPeriod) > 0 ? (
-                    <div className="sm:col-span-2">
-                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">You save vs. undiscounted</p>
-                      <p className="text-2xl font-semibold text-emerald-700">
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 p-4 sm:col-span-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-800/80">
+                        You save vs. undiscounted
+                      </p>
+                      <p className="mt-1 tabular-nums text-2xl font-semibold text-emerald-800">
                         {formatEurMajor(commitmentSavingsVsGrossEur(subscribeMonthly, billingPeriod))}
                       </p>
                     </div>
@@ -726,27 +763,30 @@ export default function PlanPage() {
                 </div>
               </div>
 
-              <div className="flex min-h-0 flex-col gap-6 border-t border-gray-100 pt-8 xl:mt-0 xl:h-full xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
-                <div className="min-h-0 flex-1">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">What&apos;s included</h3>
-                  <ul className="mt-4 space-y-3">
-                    {[
-                      'Client portal, monitoring, and integrations',
-                      'Dedicated delivery team and Slack Connect workspace',
-                      'SLA-backed response within subscription scope',
-                      'Rollover of unused capacity (3-month window, capped at 1.5× your monthly subscription amount)',
-                    ].map((line) => (
-                      <li key={line} className="flex gap-3 text-sm text-gray-800">
-                        <Check className="mt-0.5 h-5 w-5 shrink-0 text-gray-900" aria-hidden />
-                        {line}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              <div className="flex flex-col bg-gray-50/50 p-6 sm:p-8">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500">What&apos;s included</h3>
+                <ul className="mt-5 flex-1 space-y-4">
+                  {[
+                    'Client portal, monitoring, and integrations',
+                    'Dedicated delivery team and Slack Connect workspace',
+                    'SLA-backed response within subscription scope',
+                    'Rollover of unused capacity (3-month window, capped at 1.5× monthly)',
+                  ].map((line) => (
+                    <li key={line} className="flex gap-3 text-sm leading-relaxed text-gray-800">
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#bfe937]/30">
+                        <Check className="h-3.5 w-3.5 text-gray-900" aria-hidden />
+                      </span>
+                      {line}
+                    </li>
+                  ))}
+                </ul>
 
-                <p className="shrink-0 text-center text-sm text-gray-600 xl:text-left">
-                  Custom needs above {formatEurMajor(SUBSCRIPTION_MONTHLY_MAX_EUR)}?{' '}
-                  <a href="mailto:sales@superwork.com" className="font-medium text-gray-900 underline">
+                <p className="mt-6 text-sm text-gray-600">
+                  Need more than {formatEurMajor(SUBSCRIPTION_MONTHLY_MAX_EUR)}?{' '}
+                  <a
+                    href="mailto:sales@superwork.com"
+                    className="font-semibold text-gray-900 underline decoration-gray-400 underline-offset-2 hover:decoration-gray-900"
+                  >
                     Talk to sales
                   </a>
                 </p>
@@ -755,12 +795,23 @@ export default function PlanPage() {
                   type="button"
                   onClick={handleSubscribe}
                   disabled={checkoutLoading || !ctx.canManageBilling}
-                  className="mt-auto w-full shrink-0 rounded-xl bg-gray-900 px-6 py-4 text-base font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#bfe937] px-6 py-4 text-base font-semibold text-gray-900 shadow-sm transition-colors hover:bg-[#acd829] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {checkoutLoading ? 'Redirecting to Stripe…' : 'Continue to secure checkout'}
+                  {checkoutLoading ? (
+                    'Redirecting to Stripe…'
+                  ) : (
+                    <>
+                      <Lock className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                      Continue to secure checkout
+                    </>
+                  )}
                 </button>
+                <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-gray-500">
+                  <StripeMark className="h-3.5 w-3.5 shrink-0 text-[#635BFF]" aria-hidden />
+                  Payments secured by Stripe
+                </p>
                 {!ctx.canManageBilling ? (
-                  <p className="mt-3 shrink-0 text-center text-xs text-gray-500 xl:text-left">
+                  <p className="mt-2 text-center text-xs text-gray-500">
                     Only workspace owners and admins can subscribe.
                   </p>
                 ) : null}
