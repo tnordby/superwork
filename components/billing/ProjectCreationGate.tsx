@@ -1,43 +1,12 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
-import { useAuth } from '@/components/AuthProvider';
-import { isInternalStaff } from '@/lib/auth/platform-role';
+import type { ReactNode } from 'react';
 import { ActivePlanRequired } from '@/components/billing/ActivePlanRequired';
-
-type GateState = 'loading' | 'allowed' | 'blocked';
+import { useProjectCreationEligibility } from '@/hooks/use-project-creation-eligibility';
 
 export function ProjectCreationGate({ children }: { children: ReactNode }) {
-  const { platformRole } = useAuth();
-  const [state, setState] = useState<GateState>('loading');
-
-  useEffect(() => {
-    if (platformRole !== null && isInternalStaff(platformRole)) {
-      setState('allowed');
-      return;
-    }
-
-    if (platformRole === null) {
-      return;
-    }
-
-    let cancelled = false;
-
-    void fetch('/api/account/project-creation-eligibility', { credentials: 'include' })
-      .then(async (res) => {
-        const data = res.ok ? await res.json() : null;
-        if (cancelled) return;
-        setState(data?.allowed === true ? 'allowed' : 'blocked');
-      })
-      .catch(() => {
-        if (!cancelled) setState('blocked');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [platformRole]);
+  const state = useProjectCreationEligibility();
 
   if (state === 'loading') {
     return (

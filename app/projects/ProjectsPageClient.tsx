@@ -28,9 +28,13 @@ import {
   Pause,
   Eye,
   FileText,
+  Loader2,
 } from 'lucide-react';
 import type { Project } from '@/types/projects';
 import type { ProjectsBrowseServiceRow } from '@/types/services';
+import { ActivePlanRequired } from '@/components/billing/ActivePlanRequired';
+import { useProjectCreationEligibility } from '@/hooks/use-project-creation-eligibility';
+import { PROJECT_CREATION_PLAN_PATH } from '@/lib/billing/project-creation-eligibility';
 
 export interface ProjectsPageClientProps {
   initialServiceTemplates: ProjectsBrowseServiceRow[];
@@ -50,6 +54,8 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [viewingClientName, setViewingClientName] = useState<string | null>(null);
+  const projectCreationEligibility = useProjectCreationEligibility();
+  const canBrowseServices = projectCreationEligibility === 'allowed';
 
   useEffect(() => {
     async function loadContext() {
@@ -429,13 +435,23 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
                   Get started by browsing our services or submitting a custom brief
                 </p>
                 <div className="flex items-center justify-center gap-3">
-                  <button
-                    onClick={() => setActiveTab('browse')}
-                    className="inline-flex items-center gap-2 rounded-xl bg-[#bfe937] px-6 py-3 text-sm font-medium text-gray-900 transition-opacity hover:opacity-90"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                    Browse services
-                  </button>
+                  {canBrowseServices ? (
+                    <button
+                      onClick={() => setActiveTab('browse')}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#bfe937] px-6 py-3 text-sm font-medium text-gray-900 transition-opacity hover:opacity-90"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                      Browse services
+                    </button>
+                  ) : projectCreationEligibility === 'blocked' ? (
+                    <Link
+                      href={PROJECT_CREATION_PLAN_PATH}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#bfe937] px-6 py-3 text-sm font-medium text-gray-900 transition-opacity hover:opacity-90"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      Go to plan
+                    </Link>
+                  ) : null}
                   <Link
                     href="/quote-request"
                     className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
@@ -508,7 +524,13 @@ function ProjectsPageContent({ initialServiceTemplates }: ProjectsPageClientProp
       )}
 
       {/* Browse Services — templates from server on first paint; hardcoded fallback if catalog empty */}
-      {activeTab === 'browse' && (
+      {activeTab === 'browse' && projectCreationEligibility === 'loading' && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" aria-label="Loading" />
+        </div>
+      )}
+      {activeTab === 'browse' && projectCreationEligibility === 'blocked' && <ActivePlanRequired />}
+      {activeTab === 'browse' && canBrowseServices && (
         <div>
           {serviceTemplates.length > 0 ? (
             // Database-driven services
