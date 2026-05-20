@@ -10,9 +10,25 @@ export function buildOAuthCallbackUrl(origin: string, nextPath: string): string 
   return url.toString();
 }
 
+/**
+ * Origin used in signInWithOAuth redirectTo. Prefer the browser host so production
+ * is correct even when NEXT_PUBLIC_APP_URL was left as localhost in hosting env.
+ */
 export function browserOriginForOAuth(): string {
-  if (typeof window !== 'undefined') {
-    return window.location.origin;
+  const envOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? '';
+
+  if (typeof window === 'undefined') {
+    return envOrigin;
   }
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? '';
+
+  const windowOrigin = window.location.origin;
+  if (!envOrigin) return windowOrigin;
+
+  const envIsLocal = envOrigin.includes('localhost') || envOrigin.includes('127.0.0.1');
+  const windowIsLocal = windowOrigin.includes('localhost') || windowOrigin.includes('127.0.0.1');
+  if (envIsLocal && !windowIsLocal) {
+    return windowOrigin;
+  }
+
+  return windowOrigin;
 }

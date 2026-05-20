@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { RedirectIfAuthenticated } from '@/components/auth/RedirectIfAuthenticated';
 import { Sidebar } from './navigation/Sidebar';
 import { Header } from './Header';
 import { LayoutContent } from './LayoutContent';
@@ -15,8 +16,12 @@ export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const isAdminRoute = pathname.startsWith('/admin');
 
   if (isAuthRoute) {
-    // Auth pages - no sidebar, no header, just the content
-    return <>{children}</>;
+    return (
+      <>
+        <RedirectIfAuthenticated />
+        {children}
+      </>
+    );
   }
 
   if (isAdminRoute) {

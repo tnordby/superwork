@@ -1,10 +1,10 @@
 'use client';
 
 import { useLayoutEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import { DEFAULT_POST_AUTH_PATH } from '@/lib/auth/post-auth-path';
 import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
 
@@ -17,7 +17,6 @@ export function LoginPageClient({ initialOAuthErrorMessage }: LoginPageClientPro
   const [password, setPassword] = useState('');
   const [error, setError] = useState(initialOAuthErrorMessage ?? '');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   const supabase = createClient();
 
   useLayoutEffect(() => {
@@ -55,8 +54,7 @@ export function LoginPageClient({ initialOAuthErrorMessage }: LoginPageClientPro
       }
 
       if (data.user) {
-        router.push('/');
-        router.refresh();
+        window.location.assign(DEFAULT_POST_AUTH_PATH);
       }
     } catch (err) {
       console.error('Unexpected login error:', err);
@@ -157,7 +155,7 @@ export function LoginPageClient({ initialOAuthErrorMessage }: LoginPageClientPro
                 <span className="bg-white px-2 text-gray-500">or continue with</span>
               </div>
             </div>
-            <GoogleAuthButton nextPath="/" onError={setError} disabled={loading} />
+            <GoogleAuthButton onError={setError} disabled={loading} />
           </div>
 
           <p className="mt-6 text-center text-sm text-gray-600">

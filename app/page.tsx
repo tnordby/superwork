@@ -294,14 +294,16 @@ export default async function Home() {
     data: { user: homeUser },
   } = await supabase.auth.getUser();
 
-  if (homeUser) {
-    const role = await resolvePlatformRole(supabase, homeUser.id, homeUser.user_metadata?.role);
-    if (isAdmin(role)) {
-      redirect('/admin');
-    }
-    if (isConsultant(role) || isQuoteManager(role)) {
-      redirect('/team');
-    }
+  if (!homeUser) {
+    redirect('/login');
+  }
+
+  const role = await resolvePlatformRole(supabase, homeUser.id, homeUser.user_metadata?.role);
+  if (isAdmin(role)) {
+    redirect('/admin');
+  }
+  if (isConsultant(role) || isQuoteManager(role)) {
+    redirect('/team');
   }
 
   const { activeProjects, recentActivity, billing } = await loadDashboardData();

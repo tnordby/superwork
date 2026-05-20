@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { DEFAULT_POST_AUTH_PATH } from '@/lib/auth/post-auth-path';
 import { buildOAuthCallbackUrl, browserOriginForOAuth } from '@/lib/auth/oauth-callback-url';
 
 type GoogleAuthButtonProps = {
@@ -10,7 +11,11 @@ type GoogleAuthButtonProps = {
   disabled?: boolean;
 };
 
-export function GoogleAuthButton({ nextPath = '/', onError, disabled = false }: GoogleAuthButtonProps) {
+export function GoogleAuthButton({
+  nextPath = DEFAULT_POST_AUTH_PATH,
+  onError,
+  disabled = false,
+}: GoogleAuthButtonProps) {
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
 

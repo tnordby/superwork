@@ -1,7 +1,6 @@
 'use client';
 
 import { useLayoutEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
@@ -9,6 +8,7 @@ import {
   isBlockedSignupEmailDomain,
   SIGNUP_WORK_EMAIL_REQUIRED_MESSAGE,
 } from '@/lib/auth/blocked-signup-email-domains';
+import { DEFAULT_POST_AUTH_PATH } from '@/lib/auth/post-auth-path';
 import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
 import { Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 
@@ -25,7 +25,6 @@ export function SignupPageClient({ initialOAuthErrorMessage }: SignupPageClientP
   const [error, setError] = useState(initialOAuthErrorMessage ?? '');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   const supabase = createClient();
 
   useLayoutEffect(() => {
@@ -85,8 +84,7 @@ export function SignupPageClient({ initialOAuthErrorMessage }: SignupPageClientP
         });
 
         setTimeout(() => {
-          router.push('/');
-          router.refresh();
+          window.location.assign(DEFAULT_POST_AUTH_PATH);
         }, 2000);
       }
     } catch {
@@ -234,11 +232,7 @@ export function SignupPageClient({ initialOAuthErrorMessage }: SignupPageClientP
                 <span className="bg-white px-2 text-gray-500">or continue with</span>
               </div>
             </div>
-            <GoogleAuthButton
-              nextPath="/"
-              onError={setError}
-              disabled={loading || success}
-            />
+            <GoogleAuthButton onError={setError} disabled={loading || success} />
           </div>
 
           <p className="mt-6 text-center text-sm text-gray-600">
