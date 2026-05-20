@@ -20,7 +20,6 @@ import {
   Boxes,
   Globe,
   Zap,
-  LineChart,
   Bot,
   CheckCircle,
   Clock,

@@ -64,7 +64,7 @@ export default function BillingPage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     void fetchBillingData();

@@ -246,7 +246,6 @@ export function boosterSliderIndexCount(monthlySubscriptionEur: number): number 
 
 export function boosterAmountFromSliderIndex(monthlySubscriptionEur: number, index: number): number {
   const min = boosterMinEur(monthlySubscriptionEur);
-  const max = boosterMaxEur(monthlySubscriptionEur);
   const count = boosterSliderIndexCount(monthlySubscriptionEur);
   const clamped = Math.max(0, Math.min(count - 1, Math.floor(index)));
   return min + clamped * SUBSCRIPTION_STEP_EUR;
